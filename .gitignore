@@ -23,3 +23,6 @@ next-env.d.ts
 Thumbs.db
 .vscode/
 .idea/
+
+# generated prisma clients (npx prisma generate)
+src/generated/

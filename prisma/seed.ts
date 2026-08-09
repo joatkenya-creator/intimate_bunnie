@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient } from '../src/generated/prisma-node/client.ts'
 import { PrismaPg } from '@prisma/adapter-pg'
 
 // Catalog seed. Images are deterministic remote placeholders for development —
@@ -633,7 +633,7 @@ async function main() {
         description: parent.description,
         heroImage: img(parent.slug),
         position: index,
-        seoTitle: `${parent.name} — Shop ${parent.name} Online | Intimate Bunnie`,
+        seoTitle: `${parent.name} — Shop ${parent.name} Online`,
         seoDesc: parent.description,
       },
       select: { id: true },
@@ -649,7 +649,7 @@ async function main() {
           heroImage: img(child.slug),
           position: childIndex,
           parentId: created.id,
-          seoTitle: `${child.name} | Intimate Bunnie`,
+          seoTitle: `${child.name}`,
           seoDesc: child.description,
         },
         select: { id: true },
@@ -682,7 +682,7 @@ async function main() {
         reviewCount: product.reviews ?? 0,
         tags: product.tags,
         categoryId,
-        seoTitle: `${product.name} | Intimate Bunnie`,
+        seoTitle: `${product.name}`,
         seoDesc: product.summary,
         media: {
           create: [1, 2, 3].map((n) => ({
