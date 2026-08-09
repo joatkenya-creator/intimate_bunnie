@@ -5,11 +5,15 @@
 
 # deps / build
 node_modules/
+.next/
+.open-next/
 dist/
 build/
-__pycache__/
-.venv/
-venv/
+next-env.d.ts
+*.tsbuildinfo
+
+# wrangler
+.wrangler/
 
 # logs
 *.log

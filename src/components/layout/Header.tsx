@@ -1,0 +1,41 @@
+import { db } from '@/lib/db'
+import { currentUser } from '@/lib/auth'
+import { NavBar, type NavCategory } from './NavBar'
+
+async function getNav(): Promise<NavCategory[]> {
+  // The header renders on every route, including /_not-found, which Next
+  // prerenders at build time when no database is reachable. A missing nav
+  // degrades the chrome; it should never take a page down.
+  try {
+    return await db.category.findMany({
+      where: { parentId: null },
+      orderBy: { position: 'asc' },
+      select: {
+        slug: true,
+        name: true,
+        children: { orderBy: { position: 'asc' }, select: { slug: true, name: true } },
+      },
+    })
+  } catch {
+    return []
+  }
+}
+
+export async function Header() {
+  // Read the session first. It touches cookies(), which opts every route into
+  // dynamic rendering — so the nav query below never runs during the build,
+  // when there is no database to reach.
+  const user = await currentUser().catch(() => null)
+  const categories = await getNav()
+
+  return (
+    <header className="sticky top-0 z-40 border-b border-line bg-cream/95 backdrop-blur-sm">
+      <div className="bg-plum-900 py-2 text-center text-[0.6875rem] uppercase tracking-[0.14em] text-peach-100">
+        Discreet plain packaging · Free U.S. shipping over $59
+      </div>
+      <div className="container-ib">
+        <NavBar categories={categories} signedIn={Boolean(user)} />
+      </div>
+    </header>
+  )
+}

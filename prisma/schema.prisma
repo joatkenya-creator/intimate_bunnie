@@ -1,0 +1,236 @@
+// Intimate Bunnie — PostgreSQL schema.
+// Money is stored in integer cents (USD). No floats anywhere near a price.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Category {
+  id          String     @id @default(cuid())
+  slug        String     @unique
+  name        String
+  description String?
+  // Merchandising copy shown above the grid; also feeds category metadata.
+  seoTitle    String?
+  seoDesc     String?
+  heroImage   String?
+  position    Int        @default(0)
+  parentId    String?
+  parent      Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children    Category[] @relation("CategoryTree")
+  products    Product[]
+
+  @@index([parentId, position])
+}
+
+model Brand {
+  id       String    @id @default(cuid())
+  slug     String    @unique
+  name     String
+  products Product[]
+}
+
+model Collection {
+  id       String    @id @default(cuid())
+  slug     String    @unique
+  name     String
+  products Product[] @relation("CollectionProducts")
+}
+
+model Product {
+  id           String   @id @default(cuid())
+  slug         String   @unique
+  name         String
+  // Short line used on cards and meta descriptions.
+  summary      String
+  description  String
+  priceCents   Int
+  comparePrice Int?
+  sku          String   @unique
+  inventory    Int      @default(0)
+  active       Boolean  @default(true)
+  featured     Boolean  @default(false)
+  rating       Float    @default(0)
+  reviewCount  Int      @default(0)
+  seoTitle     String?
+  seoDesc      String?
+  tags         String[] @default([])
+
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id])
+  brandId    String?
+  brand      Brand?   @relation(fields: [brandId], references: [id])
+
+  collections Collection[]  @relation("CollectionProducts")
+  media       ProductMedia[]
+  variants    Variant[]
+  reviews     Review[]
+  orderItems  OrderItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([categoryId, active])
+  @@index([featured, active])
+  @@index([priceCents])
+}
+
+model Variant {
+  id          String  @id @default(cuid())
+  productId   String
+  product     Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  // e.g. "Size" / "Color"
+  optionName  String
+  optionValue String
+  sku         String  @unique
+  priceDelta  Int     @default(0)
+  inventory   Int     @default(0)
+
+  @@index([productId])
+}
+
+model ProductMedia {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url       String
+  altText   String
+  width     Int?
+  height    Int?
+  mimeType  String?
+  position  Int     @default(0)
+
+  // Provenance for the ingestion pipeline — only commercially reusable media ships.
+  sourceUrl     String?
+  sourceType    String?
+  licenseStatus String  @default("unverified")
+  hash          String?
+  createdAt     DateTime @default(now())
+
+  @@index([productId, position])
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  authorName String
+  rating    Int
+  title     String
+  body      String
+  approved  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([productId, approved])
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  name         String?
+  role         Role      @default(CUSTOMER)
+  addresses    Address[]
+  orders       Order[]
+  createdAt    DateTime  @default(now())
+}
+
+enum Role {
+  CUSTOMER
+  ADMIN
+}
+
+model Address {
+  id       String  @id @default(cuid())
+  userId   String
+  user     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fullName String
+  line1    String
+  line2    String?
+  city     String
+  state    String
+  zip      String
+  country  String  @default("US")
+  phone    String?
+  isDefault Boolean @default(false)
+
+  @@index([userId])
+}
+
+model Order {
+  id     String @id @default(cuid())
+  // Human-facing reference, e.g. IB-4F7K2Q.
+  number String @unique
+  userId String?
+  user   User?  @relation(fields: [userId], references: [id])
+  email  String
+
+  status        OrderStatus @default(PENDING)
+  subtotalCents Int
+  shippingCents Int         @default(0)
+  taxCents      Int         @default(0)
+  totalCents    Int
+
+  shipName  String
+  shipLine1 String
+  shipLine2 String?
+  shipCity  String
+  shipState String
+  shipZip   String
+
+  paymentProvider  String  @default("dev")
+  paymentReference String?
+
+  items     OrderItem[]
+  createdAt DateTime    @default(now())
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  FULFILLED
+  CANCELLED
+  REFUNDED
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  // Denormalized so an order stays readable after a product is renamed or deleted.
+  name        String
+  variantName String?
+  unitCents   Int
+  quantity    Int
+
+  @@index([orderId])
+}
+
+model Coupon {
+  id            String   @id @default(cuid())
+  code          String   @unique
+  percentOff    Int?
+  amountOffCents Int?
+  active        Boolean  @default(true)
+  expiresAt     DateTime?
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actor     String
+  action    String
+  target    String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}

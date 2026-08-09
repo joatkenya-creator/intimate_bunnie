@@ -1,0 +1,157 @@
+@import 'tailwindcss';
+
+/* ── Intimate Bunnie design tokens ─────────────────────────────────────────
+   Peach carries the warmth, pink is the accent that signs the brand, plum is
+   the ink. Pink is never a background for large surfaces. */
+@theme {
+  --color-cream: #fffaf7;
+  --color-shell: #fdf1ea;
+  --color-peach-50: #fff4ee;
+  --color-peach-100: #ffe7db;
+  --color-peach-200: #ffd4c0;
+  --color-peach-300: #ffbda1;
+  --color-peach-400: #f79f7d;
+  --color-peach-500: #e8815d;
+
+  --color-rose-50: #fce4ec;
+  --color-rose-100: #f9c8d9;
+  --color-rose-300: #f07aa4;
+  --color-rose-500: #e91e63;
+  --color-rose-600: #c8154f;
+  --color-rose-700: #9d0f3d;
+
+  --color-plum-900: #2b1a22;
+  --color-plum-700: #4b323d;
+  --color-plum-500: #7a6069;
+  --color-plum-300: #a6919a;
+
+  --color-line: #f0ddd4;
+  --color-gold: #b8935a;
+
+  --font-display: var(--font-display), Georgia, 'Times New Roman', serif;
+  --font-sans: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+
+  --radius-card: 2px;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-cream);
+    color: var(--color-plum-900);
+    font-family: var(--font-sans);
+    font-feature-settings: 'kern' 1;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    font-weight: 400;
+    letter-spacing: -0.015em;
+  }
+
+  /* Visible focus everywhere, not just on the elements we remembered. */
+  :focus-visible {
+    outline: 2px solid var(--color-rose-500);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: var(--color-peach-200);
+  }
+}
+
+@layer components {
+  .container-ib {
+    width: 100%;
+    margin-inline: auto;
+    max-width: 80rem;
+    padding-inline: 1.25rem;
+  }
+
+  @media (min-width: 1024px) {
+    .container-ib {
+      padding-inline: 2.5rem;
+    }
+  }
+
+  /* Small-caps eyebrow used to open sections — the one repeated motif. */
+  .eyebrow {
+    font-size: 0.6875rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--color-plum-500);
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.8125rem 1.5rem;
+    font-size: 0.8125rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border: 1px solid transparent;
+    transition: background-color 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+  }
+
+  .btn-primary {
+    background: var(--color-rose-500);
+    color: #fff;
+  }
+  .btn-primary:hover {
+    background: var(--color-rose-600);
+  }
+  .btn-primary:disabled {
+    background: var(--color-plum-300);
+    cursor: not-allowed;
+  }
+
+  .btn-outline {
+    border-color: var(--color-plum-900);
+    color: var(--color-plum-900);
+  }
+  .btn-outline:hover {
+    background: var(--color-plum-900);
+    color: var(--color-cream);
+  }
+
+  .field {
+    width: 100%;
+    border: 1px solid var(--color-line);
+    background: #fff;
+    padding: 0.6875rem 0.875rem;
+    font-size: 0.9375rem;
+    color: var(--color-plum-900);
+  }
+  .field::placeholder {
+    color: var(--color-plum-300);
+  }
+  .field:focus {
+    border-color: var(--color-peach-400);
+  }
+
+  .link-underline {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    text-decoration-color: var(--color-peach-300);
+  }
+  .link-underline:hover {
+    text-decoration-color: var(--color-rose-500);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
