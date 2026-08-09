@@ -8,6 +8,15 @@
     "directory": ".open-next/assets",
     "binding": "ASSETS"
   },
+  // Cloudflare creates the DNS records and certificates for these itself —
+  // do not add A/CNAME records by hand.
+  "routes": [
+    { "pattern": "intimatebunnie.com", "custom_domain": true },
+    { "pattern": "www.intimatebunnie.com", "custom_domain": true }
+  ],
+  // The store is reachable only on the custom domain; the workers.dev
+  // subdomain would otherwise serve the same catalog on a second hostname.
+  "workers_dev": false,
   "observability": {
     "enabled": true
   }
