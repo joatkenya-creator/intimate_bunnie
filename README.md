@@ -18,7 +18,7 @@ npm install
 cp .env.example .env        # fill in DATABASE_URL and AUTH_SECRET
 npx prisma generate
 npm run db:push             # create tables
-npm run db:seed             # 40 products across 6 categories
+npm run db:seed             # 38 products across 6 top-level categories
 npm run dev
 ```
 

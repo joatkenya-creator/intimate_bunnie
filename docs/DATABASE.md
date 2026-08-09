@@ -49,8 +49,9 @@ is data worth keeping.
 
 ## Seed
 
-`npm run db:seed` clears the catalog and inserts 6 top-level categories, 13
-subcategories, and 40 products with variants, media, and approved reviews.
+`npm run db:seed` clears the catalog and inserts 6 top-level categories, 15
+subcategories, and 38 products — 73 variants, 114 media rows, and approved
+reviews.
 
 Product images are `picsum.photos` placeholders, recorded with
 `licenseStatus: "development-placeholder"`. Replace them before launch — the
