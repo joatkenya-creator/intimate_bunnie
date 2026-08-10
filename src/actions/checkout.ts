@@ -3,8 +3,12 @@
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { currentUser } from '@/lib/auth'
-import { quoteTotals } from '@/lib/money'
+import { quoteTotals, formatUSD } from '@/lib/money'
+import { notify } from '@/server/admin'
 import { getPaymentProvider } from '@/services/payment'
+import { sendOrderPlaced } from '@/services/email'
+import { absoluteUrl } from '@/config/site'
+import { reference } from '@/lib/ids'
 
 const lineSchema = z.object({
   productId: z.string().min(1),
@@ -25,13 +29,6 @@ const checkoutSchema = z.object({
 
 export type CheckoutInput = z.input<typeof checkoutSchema>
 export type CheckoutResult = { ok: true; orderNumber: string } | { ok: false; error: string }
-
-/** Base32-ish, no vowels — an order number nobody misreads over the phone. */
-function orderNumber(): string {
-  const alphabet = '23456789BCDFGHJKLMNPQRSTVWXZ'
-  const bytes = crypto.getRandomValues(new Uint8Array(6))
-  return `IB-${Array.from(bytes, (b) => alphabet[b % alphabet.length]).join('')}`
-}
 
 export async function placeOrder(input: CheckoutInput): Promise<CheckoutResult> {
   const parsed = checkoutSchema.safeParse(input)
@@ -74,7 +71,7 @@ export async function placeOrder(input: CheckoutInput): Promise<CheckoutResult> 
   }
 
   const totals = quoteTotals(items.reduce((sum, i) => sum + i.unitCents * i.quantity, 0))
-  const number = orderNumber()
+  const number = reference('IB')
   const user = await currentUser()
 
   const payment = await getPaymentProvider().createPayment({
@@ -113,7 +110,48 @@ export async function placeOrder(input: CheckoutInput): Promise<CheckoutResult> 
         ? db.variant.update({ where: { id: line.variantId }, data: { inventory: { decrement: line.quantity } } })
         : db.product.update({ where: { id: line.productId }, data: { inventory: { decrement: line.quantity } } }),
     ),
+    // On-hand comes down now; `reservedStock` counts the units sold but still
+    // on the shelf, which is what a picker needs to see. Fulfilment or
+    // cancellation releases it — see actions/admin/orders.ts.
+    ...lines.map((line) =>
+      db.product.update({ where: { id: line.productId }, data: { reservedStock: { increment: line.quantity } } }),
+    ),
+    // Every stock movement gets a history row, including the automatic ones.
+    ...items.map((item) =>
+      db.inventoryAdjustment.create({
+        data: {
+          productId: item.productId,
+          delta: -item.quantity,
+          resulting: (products.find((p) => p.id === item.productId)?.inventory ?? item.quantity) - item.quantity,
+          reason: 'SOLD',
+          note: `Order ${number}`,
+          actor: 'checkout',
+        },
+      }),
+    ),
   ])
+
+  // After the transaction, never inside it: the order is real whether or not
+  // the receipt gets out, and sendOrderPlaced swallows its own failures.
+  await sendOrderPlaced(email, {
+    number,
+    items,
+    ...totals,
+    shipName: fullName,
+    shipLine1: line1,
+    shipLine2: line2 || null,
+    shipCity: city,
+    shipState: state.toUpperCase(),
+    shipZip: zip,
+    orderUrl: absoluteUrl(`/checkout/confirmation?order=${number}`),
+  })
+
+  await notify({
+    type: 'ORDER',
+    title: `New order ${number} — ${formatUSD(totals.totalCents)}`,
+    body: `${items.length} item${items.length === 1 ? '' : 's'} for ${email}`,
+    link: `/admin/orders/${number}`,
+  })
 
   return { ok: true, orderNumber: number }
 }

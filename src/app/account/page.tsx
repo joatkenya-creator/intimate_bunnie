@@ -76,6 +76,10 @@ export default async function AccountPage() {
       </section>
 
       <section className="mt-12 grid gap-4 sm:grid-cols-2">
+        <Link href="/account/settings" className="border border-line px-5 py-4 hover:border-peach-400">
+          <p className="text-sm font-medium">Your details</p>
+          <p className="mt-0.5 text-xs text-plum-500">Name, email, and password.</p>
+        </Link>
         <Link href="/wishlist" className="border border-line px-5 py-4 hover:border-peach-400">
           <p className="text-sm font-medium">Wishlist</p>
           <p className="mt-0.5 text-xs text-plum-500">Pieces you saved for later.</p>

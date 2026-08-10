@@ -6,7 +6,9 @@ import { HeartIcon } from '@/components/ui/icons'
 export const WISHLIST_KEY = 'ib_wishlist'
 
 export function WishlistButton({ productId, productName }: { productId: string; productName: string }) {
-  const { ids, ready, toggle } = useIdList(WISHLIST_KEY)
+  // Mirrored to the account when signed in, so support can see what a customer
+  // saved. Signed-out shoppers keep a purely local wishlist, as before.
+  const { ids, ready, toggle } = useIdList(WISHLIST_KEY, 60, '/api/wishlist')
   const saved = ready && ids.includes(productId)
 
   return (

@@ -1,5 +1,6 @@
 import { db } from '@/lib/db'
 import { currentUser } from '@/lib/auth'
+import { getSettings } from '@/server/admin'
 import { NavBar, type NavCategory } from './NavBar'
 
 async function getNav(): Promise<NavCategory[]> {
@@ -8,12 +9,14 @@ async function getNav(): Promise<NavCategory[]> {
   // degrades the chrome; it should never take a page down.
   try {
     return await db.category.findMany({
-      where: { parentId: null },
+      // Hidden categories keep their URL but leave the nav — that is what the
+      // visibility toggle in the admin means.
+      where: { parentId: null, visible: true },
       orderBy: { position: 'asc' },
       select: {
         slug: true,
         name: true,
-        children: { orderBy: { position: 'asc' }, select: { slug: true, name: true } },
+        children: { where: { visible: true }, orderBy: { position: 'asc' }, select: { slug: true, name: true } },
       },
     })
   } catch {
@@ -27,12 +30,16 @@ export async function Header() {
   // when there is no database to reach.
   const user = await currentUser().catch(() => null)
   const categories = await getNav()
+  // Editable from Settings → Branding; falls back to the default copy.
+  const branding = await getSettings('branding').catch(() => null)
 
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-cream/95 backdrop-blur-sm">
-      <div className="bg-plum-900 py-2 text-center text-[0.6875rem] uppercase tracking-[0.14em] text-peach-100">
-        Discreet plain packaging · Free U.S. shipping over $59
-      </div>
+      {(branding?.announcementActive ?? true) && (
+        <div className="bg-plum-900 py-2 text-center text-[0.6875rem] uppercase tracking-[0.14em] text-peach-100">
+          {branding?.announcement || 'Discreet plain packaging · Free U.S. shipping over $59'}
+        </div>
+      )}
       <div className="container-ib">
         <NavBar categories={categories} signedIn={Boolean(user)} />
       </div>

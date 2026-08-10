@@ -33,6 +33,38 @@ npx wrangler secret put AUTH_SECRET      # openssl rand -base64 32
 npm run cf:deploy
 ```
 
+## Environment variables
+
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `DATABASE_URL` | yes | Pooled Postgres connection string |
+| `AUTH_SECRET` | yes | HMAC key for sessions and emailed links; 32+ characters |
+| `NEXT_PUBLIC_SITE_URL` | yes at build | Canonical URLs, sitemap, OG tags — inlined at build time |
+| `ADMIN_SESSION_TIMEOUT_MINUTES` | no (60) | Admin idle timeout |
+| `RESEND_API_KEY` | no | Without it, mail is logged instead of sent |
+| `EMAIL_FROM`, `EMAIL_REPLY_TO` | no | Envelope sender and reply routing |
+| `MEDIA_PUBLIC_BASE` | no | Public base URL for the R2 bucket; uploads are disabled without it |
+| `CRON_SECRET` | no | Bearer token for `POST /api/admin/cron` |
+| `ADMIN_EMAIL`, `ADMIN_PASSWORD` | seed only | Credentials the admin seed creates |
+| `PAYMENT_PROVIDER` | no (`dev`) | Reported on the dashboard health panel |
+
+## Optional bindings
+
+Media uploads need an R2 bucket. Without one the admin still works — "Add by
+URL" is the path, and the upload endpoint returns a 501 with an actionable
+message rather than a stack trace.
+
+```jsonc
+// wrangler.jsonc
+"r2_buckets": [
+  { "binding": "MEDIA_BUCKET", "bucket_name": "intimate-bunnie-media" }
+]
+```
+
+Scheduled publishing already runs on middleware's once-a-minute redirect poll. For
+exact timing and the low-stock sweep, add a cron trigger pointed at
+`POST /api/admin/cron` with an `authorization: Bearer $CRON_SECRET` header.
+
 Set `NEXT_PUBLIC_SITE_URL` to the production origin **before** building —
 `NEXT_PUBLIC_*` values are inlined at build time, and canonical URLs, the
 sitemap, and OG tags all read from it.

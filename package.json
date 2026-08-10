@@ -12,6 +12,7 @@
     "test": "node --test --experimental-strip-types tests/*.test.ts",
     "db:push": "prisma db push",
     "db:seed": "node --experimental-strip-types --env-file-if-exists=.env prisma/seed.ts",
+    "db:seed:admin": "node --experimental-strip-types --env-file-if-exists=.env prisma/seed-admin.ts",
     "cf:build": "opennextjs-cloudflare build",
     "cf:size": "opennextjs-cloudflare build && wrangler deploy --dry-run",
     "cf:deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy"

@@ -1,28 +1,18 @@
 import 'server-only'
 import { cookies } from 'next/headers'
 import { db } from './db'
+import { b64url, fromB64url, timingSafeEqual } from './password'
 
-// Sessions and password hashing run entirely on Web Crypto — available in both
-// Node and workerd, so no auth dependency and no Node-only shim in the Worker.
+// Sessions run entirely on Web Crypto — available in both Node and workerd, so
+// no auth dependency and no Node-only shim in the Worker. Password hashing
+// lives in ./password because the seed script needs it too.
+
+export { hashPassword, verifyPassword } from './password'
 
 const SESSION_COOKIE = 'ib_session'
 const SESSION_MAX_AGE = 60 * 60 * 24 * 30
-const PBKDF2_ITERATIONS = 100_000
 
 const enc = new TextEncoder()
-
-function b64url(bytes: ArrayBuffer | Uint8Array): string {
-  const b = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes)
-  let s = ''
-  for (const byte of b) s += String.fromCharCode(byte)
-  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-}
-
-function fromB64url(s: string): Uint8Array<ArrayBuffer> {
-  const padded = s.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(s.length / 4) * 4, '=')
-  const bin = atob(padded)
-  return Uint8Array.from(bin, (c) => c.charCodeAt(0))
-}
 
 function secret(): string {
   const s = process.env.AUTH_SECRET
@@ -37,40 +27,62 @@ async function hmac(payload: string): Promise<string> {
   return b64url(await crypto.subtle.sign('HMAC', key, enc.encode(payload)))
 }
 
-function timingSafeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false
-  let diff = 0
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i)
-  return diff === 0
+// ── Emailed links: verify address, reset password ───────────────────────────
+// Signed and self-expiring, and bound to a value that changes once the link is
+// used — a reset link is signed against the current password hash, so it stops
+// working the moment the password changes. That buys single use without a token
+// table, a write on every request, or a job to sweep expired rows.
+
+export type TokenPurpose = 'verify-email' | 'password-reset'
+
+type TokenPayload = { p: TokenPurpose; uid: string; exp: number }
+
+export async function signToken(
+  purpose: TokenPurpose,
+  userId: string,
+  ttlSeconds: number,
+  bind: string,
+): Promise<string> {
+  const payload: TokenPayload = { p: purpose, uid: userId, exp: Math.floor(Date.now() / 1000) + ttlSeconds }
+  const body = b64url(enc.encode(JSON.stringify(payload)))
+  return `${body}.${await hmac(`${body}.${bind}`)}`
 }
 
-export async function hashPassword(password: string): Promise<string> {
-  const salt = crypto.getRandomValues(new Uint8Array(16))
-  const key = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveBits'])
-  const bits = await crypto.subtle.deriveBits(
-    { name: 'PBKDF2', salt, iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
-    key,
-    256,
-  )
-  return `pbkdf2$${PBKDF2_ITERATIONS}$${b64url(salt)}$${b64url(bits)}`
+/**
+ * The user id a token claims, WITHOUT checking the signature. Only for looking
+ * up the value to bind against; verifyToken decides whether to trust it.
+ */
+export function tokenSubject(token: string): string | null {
+  try {
+    const payload = JSON.parse(new TextDecoder().decode(fromB64url(token.split('.')[0] ?? ''))) as TokenPayload
+    return typeof payload.uid === 'string' && payload.uid ? payload.uid : null
+  } catch {
+    return null
+  }
 }
 
-export async function verifyPassword(password: string, stored: string): Promise<boolean> {
-  const [scheme, iterStr, saltStr, hashStr] = stored.split('$')
-  if (scheme !== 'pbkdf2') return false
-  const key = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveBits'])
-  const bits = await crypto.subtle.deriveBits(
-    { name: 'PBKDF2', salt: fromB64url(saltStr), iterations: Number(iterStr), hash: 'SHA-256' },
-    key,
-    256,
-  )
-  return timingSafeEqual(b64url(bits), hashStr)
+/** Returns the user id when the token is valid, unexpired, and for this purpose. */
+export async function verifyToken(purpose: TokenPurpose, token: string, bind: string): Promise<string | null> {
+  const [body, sig] = token.split('.')
+  if (!body || !sig) return null
+  if (!timingSafeEqual(await hmac(`${body}.${bind}`), sig)) return null
+  try {
+    const payload = JSON.parse(new TextDecoder().decode(fromB64url(body))) as TokenPayload
+    if (payload.p !== purpose) return null
+    return payload.exp > Math.floor(Date.now() / 1000) ? payload.uid : null
+  } catch {
+    return null
+  }
 }
 
-type SessionPayload = { uid: string; exp: number }
+// `iat` is what admin idle timeout reads. It is optional on the type because
+// sessions minted before it existed are still valid for the storefront — the
+// admin gate treats a missing `iat` as "unknown age" and asks for a fresh login.
+type SessionPayload = { uid: string; exp: number; iat?: number }
 
 export async function createSession(userId: string): Promise<void> {
-  const payload: SessionPayload = { uid: userId, exp: Math.floor(Date.now() / 1000) + SESSION_MAX_AGE }
+  const now = Math.floor(Date.now() / 1000)
+  const payload: SessionPayload = { uid: userId, exp: now + SESSION_MAX_AGE, iat: now }
   const body = b64url(enc.encode(JSON.stringify(payload)))
   const token = `${body}.${await hmac(body)}`
   const jar = await cookies()
@@ -119,6 +131,17 @@ export async function requireUser() {
 
 export async function requireAdmin() {
   const user = await currentUser()
-  if (!user || user.role !== 'ADMIN') throw new Error('FORBIDDEN')
+  if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) throw new Error('FORBIDDEN')
   return user
+}
+
+/**
+ * Seconds since this session was issued, or null when the cookie is missing,
+ * invalid, or predates `iat`. Admin routes use it for an idle timeout that the
+ * long storefront cookie deliberately does not enforce.
+ */
+export async function sessionAgeSeconds(): Promise<number | null> {
+  const session = await readSession()
+  if (!session?.iat) return null
+  return Math.floor(Date.now() / 1000) - session.iat
 }

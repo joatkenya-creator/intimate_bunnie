@@ -1,5 +1,22 @@
 # SEO
 
+## Editable from the admin
+
+`/admin/seo` audits meta titles, descriptions, canonicals, and robots directives
+across products, categories, and content, flagging what is missing or over the
+recommended length. `/admin/seo/redirects` manages 301/302 rules, applied in
+middleware before routing and refused at save time if they would form a chain.
+
+Per-record fields (`seoTitle`, `seoDesc`, `canonicalUrl`, `ogImage`, `robots`)
+feed the same `pageMetadata()` helper described below — the admin sets inputs, it
+does not build tags of its own. The sitemap picks up published CMS pages
+automatically and excludes anything carrying a robots directive; hidden
+categories drop out of both the nav and the sitemap.
+
+The admin itself is `noindex, nofollow` at the layout level and is never linked
+from the storefront.
+
+
 ## Metadata
 
 `src/lib/seo.ts` holds `pageMetadata()`, the single place a page's title,

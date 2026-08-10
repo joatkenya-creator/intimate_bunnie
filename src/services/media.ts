@@ -19,3 +19,61 @@ export function imageUrl(url: string, options: ImageTransform = {}): string {
 
 export const PLACEHOLDER_IMAGE =
   'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="4" height="5"><rect width="4" height="5" fill="%23fdf1ea"/></svg>'
+
+// ── Upload boundary ─────────────────────────────────────────────────────────
+// The admin media library needs somewhere to put bytes. Same shape as the
+// transform boundary above: one interface, one implementation today, and the
+// call site never learns which one it got.
+
+export class MediaStorageUnconfigured extends Error {
+  constructor() {
+    super('No media bucket is configured. Add an R2 binding named MEDIA_BUCKET, or add media by URL.')
+  }
+}
+
+export interface MediaStorageProvider {
+  readonly id: string
+  put(key: string, file: File): Promise<string>
+}
+
+/** Same filename twice must not overwrite the first upload. */
+export function storageKey(folder: string, filename: string): string {
+  const safe = filename.toLowerCase().replace(/[^a-z0-9.]+/g, '-').replace(/^-+|-+$/g, '').slice(-80)
+  const stamp = crypto.getRandomValues(new Uint32Array(1))[0].toString(36)
+  return `${folder.replace(/^\/+|\/+$/g, '') || 'uploads'}/${stamp}-${safe}`
+}
+
+/**
+ * R2 through the Worker binding. Reached with a dynamic import so `next dev`
+ * under Node never loads the Cloudflare adapter, and so an unbound deployment
+ * fails with a sentence an operator can act on instead of a type error.
+ */
+export async function getMediaStorage(): Promise<MediaStorageProvider> {
+  const publicBase = process.env.MEDIA_PUBLIC_BASE?.replace(/\/$/, '')
+
+  try {
+    const { getCloudflareContext } = await import('@opennextjs/cloudflare')
+    const bucket = (getCloudflareContext().env as Record<string, unknown>).MEDIA_BUCKET as
+      | { put(key: string, value: ArrayBuffer, options?: unknown): Promise<unknown> }
+      | undefined
+
+    if (bucket && publicBase) {
+      return {
+        id: 'r2',
+        async put(key, file) {
+          await bucket.put(key, await file.arrayBuffer(), { httpMetadata: { contentType: file.type } })
+          return `${publicBase}/${key}`
+        },
+      }
+    }
+  } catch {
+    // Not running on Workers — fall through to the unconfigured provider.
+  }
+
+  return {
+    id: 'unconfigured',
+    async put() {
+      throw new MediaStorageUnconfigured()
+    },
+  }
+}

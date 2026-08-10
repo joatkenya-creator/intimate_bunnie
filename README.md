@@ -19,18 +19,23 @@ cp .env.example .env        # fill in DATABASE_URL and AUTH_SECRET
 npx prisma generate
 npm run db:push             # create tables
 npm run db:seed             # 38 products across 6 top-level categories
+npm run db:seed:admin       # roles, staff, orders, customers, content, settings
 npm run dev
 ```
 
 Generate an `AUTH_SECRET` with `openssl rand -base64 32`.
 
-To make yourself an admin, register at `/account/register`, then:
+The admin seed prints the credentials it created (`owner@intimatebunnie.test`
+unless you set `ADMIN_EMAIL` / `ADMIN_PASSWORD`). Sign in at `/account/login`,
+then open `/admin`. To promote an existing account instead:
 
 ```sql
-UPDATE "User" SET role = 'ADMIN' WHERE email = 'you@example.com';
+UPDATE "User" SET role = 'SUPER_ADMIN' WHERE email = 'you@example.com';
 ```
 
-`/admin` is then reachable.
+The back office covers products, inventory, orders, returns, customers,
+promotions, content, blog, SEO, reports, settings, and staff roles — see
+[ADMIN.md](docs/ADMIN.md).
 
 ## Scripts
 
@@ -42,7 +47,8 @@ UPDATE "User" SET role = 'ADMIN' WHERE email = 'you@example.com';
 | `npm run lint` | ESLint |
 | `npm test` | Unit tests (`node --test`, no framework) |
 | `npm run db:push` | Push the Prisma schema to the database |
-| `npm run db:seed` | Reset and seed the catalog |
+| `npm run db:seed` | Reset and seed the catalog (destructive) |
+| `npm run db:seed:admin` | Seed admin data — additive, safe to re-run |
 | `npm run cf:build` | Build the Cloudflare Worker |
 | `npm run cf:size` | Build, then print the gzip Worker size |
 | `npm run cf:deploy` | Build and deploy to Cloudflare |
@@ -58,6 +64,7 @@ npm run cf:size          # Total Upload / gzip must stay under 2.5 MiB
 ## Docs
 
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- [ADMIN.md](docs/ADMIN.md)
 - [DEPLOYMENT.md](docs/DEPLOYMENT.md)
 - [DATABASE.md](docs/DATABASE.md)
 - [SECURITY.md](docs/SECURITY.md)

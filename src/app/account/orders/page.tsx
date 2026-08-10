@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { currentUser } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { formatUSD } from '@/lib/money'
+import { isReturnable } from '@/lib/returns'
 import { pageMetadata } from '@/lib/seo'
 
 export const dynamic = 'force-dynamic'
@@ -29,6 +30,10 @@ export default async function OrdersPage() {
       totalCents: true,
       createdAt: true,
       items: { select: { id: true, name: true, variantName: true, quantity: true, unitCents: true } },
+      returns: {
+        select: { number: true, status: true, resolutionNote: true },
+        orderBy: { createdAt: 'desc' },
+      },
     },
   })
 
@@ -66,6 +71,22 @@ export default async function OrdersPage() {
                   </li>
                 ))}
               </ul>
+
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-5 py-3 text-xs">
+                {order.returns.length > 0 ? (
+                  <span className="text-plum-500">
+                    Return {order.returns[0].number} · {order.returns[0].status.toLowerCase()}
+                    {order.returns[0].resolutionNote && ` — ${order.returns[0].resolutionNote}`}
+                  </span>
+                ) : (
+                  <span className="text-plum-300">Unopened items can go back within 30 days.</span>
+                )}
+                {isReturnable(order) && order.returns.length === 0 && (
+                  <Link href={`/account/orders/${order.number}/return`} className="uppercase tracking-wider link-underline">
+                    Request a return
+                  </Link>
+                )}
+              </div>
             </li>
           ))}
         </ul>

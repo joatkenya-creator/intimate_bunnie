@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { pageMetadata, jsonLd } from '@/lib/seo'
 import { site } from '@/config/site'
+import { db } from '@/lib/db'
 
 type Params = { slug: string }
 
@@ -98,12 +99,41 @@ const DOCS: Record<string, Doc> = {
   },
 }
 
-export function generateStaticParams() {
-  return Object.keys(DOCS).map((slug) => ({ slug }))
+// Dynamic since the CMS took over: a page edited in the admin has to be live
+// on the next request, not on the next deploy. The static DOCS below stay as
+// the fallback, so a fresh database still serves every policy.
+export const dynamic = 'force-dynamic'
+
+/**
+ * A published Page or Policy in the admin CMS wins over the static copy above.
+ * The static documents stay as the fallback so the store still has its policies
+ * on a fresh database — and so removing a CMS entry cannot 404 a legal page.
+ */
+async function managed(slug: string) {
+  try {
+    return await db.contentEntry.findFirst({
+      where: { slug, type: { in: ['PAGE', 'POLICY'] }, status: 'PUBLISHED' },
+      select: { title: true, excerpt: true, body: true, seoTitle: true, seoDesc: true, canonicalUrl: true, robots: true, heroImage: true },
+    })
+  } catch {
+    // A page must not go down because the database blinked.
+    return null
+  }
 }
 
 export async function generateMetadata({ params }: { params: Promise<Params> }): Promise<Metadata> {
   const { slug } = await params
+  const entry = await managed(slug)
+  if (entry) {
+    return pageMetadata({
+      title: entry.seoTitle ?? entry.title,
+      description: entry.seoDesc ?? entry.excerpt ?? '',
+      path: `/pages/${slug}`,
+      image: entry.heroImage,
+      noindex: entry.robots?.includes('noindex'),
+    })
+  }
+
   const doc = DOCS[slug]
   if (!doc) return pageMetadata({ title: 'Not found', description: '', path: '/', noindex: true })
   return pageMetadata({ title: doc.title, description: doc.description, path: `/pages/${slug}` })
@@ -111,6 +141,21 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
 
 export default async function ContentPage({ params }: { params: Promise<Params> }) {
   const { slug } = await params
+
+  const entry = await managed(slug)
+  if (entry) {
+    return (
+      <div className="container-ib max-w-2xl py-16">
+        <h1 className="text-4xl">{entry.title}</h1>
+        {/* Sanitised on write in actions/admin/content.ts — never on read. */}
+        <div
+          className="mt-6 space-y-5 text-[0.9375rem] leading-relaxed text-plum-700"
+          dangerouslySetInnerHTML={{ __html: entry.body }}
+        />
+      </div>
+    )
+  }
+
   const doc = DOCS[slug]
   if (!doc) notFound()
 

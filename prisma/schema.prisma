@@ -36,6 +36,9 @@ model Category {
   seoDesc     String?
   heroImage   String?
   position    Int        @default(0)
+  // Hidden categories keep their URL but drop out of nav and listings.
+  visible     Boolean    @default(true)
+  featured    Boolean    @default(false)
   parentId    String?
   parent      Category?  @relation("CategoryTree", fields: [parentId], references: [id])
   children    Category[] @relation("CategoryTree")
@@ -52,9 +55,26 @@ model Brand {
 }
 
 model Collection {
-  id       String    @id @default(cuid())
-  slug     String    @unique
-  name     String
+  id          String    @id @default(cuid())
+  slug        String    @unique
+  name        String
+  description String?
+  heroImage   String?
+  featured    Boolean   @default(false)
+  position    Int       @default(0)
+  seoTitle    String?
+  seoDesc     String?
+
+  // A manual collection lists products explicitly. An automatic one stores the
+  // match rules and resolves its members at read time — no membership rows to
+  // keep in sync when a product's price or tags change.
+  automatic Boolean @default(false)
+  rules     Json?
+
+  // Scheduling window. Null on either side means "no bound".
+  startsAt DateTime?
+  endsAt   DateTime?
+
   products Product[] @relation("CollectionProducts")
 }
 
@@ -69,6 +89,9 @@ model Product {
   comparePrice Int?
   sku          String   @unique
   inventory    Int      @default(0)
+  // `active` stays the single flag every storefront query filters on. Admin
+  // never sets it by hand — it is derived from `status` and `publishAt` so the
+  // catalog cannot disagree with the editor.
   active       Boolean  @default(true)
   featured     Boolean  @default(false)
   rating       Float    @default(0)
@@ -76,6 +99,32 @@ model Product {
   seoTitle     String?
   seoDesc      String?
   tags         String[] @default([])
+
+  status     ProductStatus @default(PUBLISHED)
+  publishAt  DateTime?
+  archivedAt DateTime?
+
+  // Stock the storefront must not sell: held by unfulfilled orders. Incoming is
+  // a purchase order the buyer has placed but not received.
+  reservedStock Int @default(0)
+  incomingStock Int @default(0)
+  lowStockAt    Int @default(5)
+
+  weightGrams   Int?
+  shippingClass String?
+  // Free-form spec sheet — [{ label, value }]. Merchandising copy varies too
+  // much per category to earn a column each.
+  attributes    Json?
+
+  // Cross-sells, stored as ids rather than a join table: they are read as a
+  // batch on one page and never queried from the other direction.
+  relatedIds        String[] @default([])
+  boughtTogetherIds String[] @default([])
+
+  canonicalUrl String?
+  ogImage      String?
+  robots       String?
+  schemaJson   Json?
 
   categoryId String
   category   Category @relation(fields: [categoryId], references: [id])
@@ -87,6 +136,8 @@ model Product {
   variants    Variant[]
   reviews     Review[]
   orderItems  OrderItem[]
+  adjustments InventoryAdjustment[]
+  wishlisted  WishlistItem[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -94,6 +145,15 @@ model Product {
   @@index([categoryId, active])
   @@index([featured, active])
   @@index([priceCents])
+  @@index([status, updatedAt])
+  @@index([inventory])
+}
+
+enum ProductStatus {
+  DRAFT
+  PUBLISHED
+  SCHEDULED
+  ARCHIVED
 }
 
 model Variant {
@@ -106,6 +166,9 @@ model Variant {
   sku         String  @unique
   priceDelta  Int     @default(0)
   inventory   Int     @default(0)
+  position    Int     @default(0)
+
+  adjustments InventoryAdjustment[]
 
   @@index([productId])
 }
@@ -151,14 +214,97 @@ model User {
   passwordHash String
   name         String?
   role         Role      @default(CUSTOMER)
+  // Null until the address is confirmed from the verification email. Nothing is
+  // gated on it yet — it marks which addresses are safe to keep mailing.
+  emailVerifiedAt DateTime?
+
+  // Staff only. The coarse `role` decides whether the admin door opens at all;
+  // this decides what is behind it. A SUPER_ADMIN needs no row here — it holds
+  // the wildcard permission unconditionally, so the store can never be locked
+  // out of its own admin by a bad role edit.
+  adminRoleId String?
+  adminRole   AdminRole? @relation(fields: [adminRoleId], references: [id])
+
+  status         UserStatus @default(ACTIVE)
+  phone          String?
+  // Merchandising labels applied by staff — "vip", "wholesale", "chargeback".
+  tags           String[]   @default([])
+  segment        String?
+  notes          String?
+  marketingOptIn Boolean    @default(false)
+  lastLoginAt    DateTime?
+
   addresses    Address[]
   orders       Order[]
+  wishlist     WishlistItem[]
+  storeCredits StoreCredit[]
+  posts        ContentEntry[]
   createdAt    DateTime  @default(now())
+
+  @@index([role, createdAt])
+  @@index([status])
 }
 
 enum Role {
   CUSTOMER
+  STAFF
   ADMIN
+  SUPER_ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  BLOCKED
+  INVITED
+}
+
+// A named permission set. `inherits` is a single parent rather than a list:
+// a chain resolves in one pass and cannot produce a diamond nobody can reason
+// about at 3am.
+model AdminRole {
+  id          String  @id @default(cuid())
+  slug        String  @unique
+  name        String
+  description String?
+  permissions String[] @default([])
+
+  inheritsId String?
+  inherits   AdminRole?  @relation("RoleInheritance", fields: [inheritsId], references: [id])
+  children   AdminRole[] @relation("RoleInheritance")
+
+  // Built-in roles cannot be deleted or renamed, only extended.
+  system Boolean @default(false)
+  users  User[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model WishlistItem {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, productId])
+  @@index([userId])
+}
+
+model StoreCredit {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Positive issues credit, negative spends it. The balance is the sum — an
+  // append-only ledger, so no row is ever edited to "fix" a balance.
+  cents     Int
+  reason    String
+  actor     String
+  expiresAt DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
 }
 
 model Address {
@@ -202,11 +348,53 @@ model Order {
   paymentProvider  String  @default("dev")
   paymentReference String?
 
+  // Running total of everything refunded against this order, so a partial
+  // refund never has to be recomputed from the return history.
+  refundedCents Int @default(0)
+
+  // Set by review, not by a model. Null means nobody has looked.
+  fraudScore Int?
+  fraudFlag  String?
+
+  carrier        String?
+  trackingNumber String?
+  shippedAt      DateTime?
+
   items     OrderItem[]
+  returns   Return[]
+  events    OrderEvent[]
   createdAt DateTime    @default(now())
 
   @@index([userId, createdAt])
   @@index([status, createdAt])
+  @@index([email])
+}
+
+// The order timeline: status changes, staff notes, payment and shipping events,
+// all in one append-only stream so "what happened to this order" is one query.
+model OrderEvent {
+  id      String         @id @default(cuid())
+  orderId String
+  order   Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  type    OrderEventType
+  message String
+  actor   String
+  meta    Json?
+  // Notes staff write to each other never reach the customer.
+  visibleToCustomer Boolean @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([orderId, createdAt])
+}
+
+enum OrderEventType {
+  STATUS
+  NOTE
+  PAYMENT
+  REFUND
+  SHIPPING
+  FRAUD
+  RETURN
 }
 
 enum OrderStatus {
@@ -228,25 +416,290 @@ model OrderItem {
   variantName String?
   unitCents   Int
   quantity    Int
+  returnItems ReturnItem[]
 
   @@index([orderId])
 }
 
+model Return {
+  id     String @id @default(cuid())
+  // Human-facing RMA, e.g. RMA-4F7K2Q.
+  number String @unique
+
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  status ReturnStatus @default(REQUESTED)
+  reason String
+  // Set on approval, computed from the returned lines — never typed by hand.
+  refundCents Int @default(0)
+  // Why a return was refused, shown to the customer on their order history.
+  resolutionNote String?
+
+  items      ReturnItem[]
+  createdAt  DateTime     @default(now())
+  resolvedAt DateTime?
+
+  @@index([orderId])
+  @@index([status, createdAt])
+}
+
+enum ReturnStatus {
+  REQUESTED
+  APPROVED
+  DENIED
+}
+
+model ReturnItem {
+  id          String    @id @default(cuid())
+  returnId    String
+  return      Return    @relation(fields: [returnId], references: [id], onDelete: Cascade)
+  orderItemId String
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id])
+  quantity    Int
+
+  // One line per item per return: a second request for the same item edits the
+  // first rather than stacking a duplicate refund.
+  @@unique([returnId, orderItemId])
+}
+
+// Every promotion is "a discount, under conditions, for a window". Splitting
+// coupons, automatic discounts, flash sales, bundles, gift cards, and referral
+// campaigns into six tables would give six copies of the same eight columns.
 model Coupon {
-  id            String   @id @default(cuid())
-  code          String   @unique
-  percentOff    Int?
+  id             String   @id @default(cuid())
+  code           String   @unique
+  name           String   @default("")
+  description    String?
+  kind           PromotionKind @default(CODE)
+  percentOff     Int?
   amountOffCents Int?
-  active        Boolean  @default(true)
-  expiresAt     DateTime?
+  active         Boolean  @default(true)
+  startsAt       DateTime?
+  expiresAt      DateTime?
+
+  minSpendCents    Int?
+  usageLimit       Int?
+  perCustomerLimit Int?
+  usedCount        Int  @default(0)
+
+  // What the discount applies to: { categoryIds?, productIds?, collectionIds? }.
+  // Absent means the whole cart.
+  appliesTo Json?
+  // Gift cards and store-credit codes carry a remaining balance.
+  balanceCents Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([active, expiresAt])
+  @@index([kind])
+}
+
+enum PromotionKind {
+  CODE
+  AUTOMATIC
+  FLASH_SALE
+  BUNDLE
+  GIFT_CARD
+  REFERRAL
+}
+
+// One table for every editable piece of copy on the site. A page, a blog post,
+// an FAQ entry, and a homepage banner differ by which fields they use, not by
+// what they are — WordPress got this right with post_type.
+model ContentEntry {
+  id      String        @id @default(cuid())
+  type    ContentType
+  slug    String
+  title   String
+  excerpt String?
+  // HTML from the editor. Sanitised on write, never on read.
+  body    String        @default("")
+  status  ContentStatus @default(DRAFT)
+
+  publishAt DateTime?
+  heroImage String?
+  // Blog taxonomy. Categories are shallow here — a post has one, and it is a
+  // label, not a tree.
+  category  String?
+  tags      String[] @default([])
+
+  authorId String?
+  author   User?   @relation(fields: [authorId], references: [id])
+
+  // Banners and FAQs are ordered lists; pages and posts ignore this.
+  position Int     @default(0)
+  linkUrl  String?
+
+  seoTitle     String?
+  seoDesc      String?
+  canonicalUrl String?
+  ogImage      String?
+  robots       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([type, slug])
+  @@index([type, status, publishAt])
+}
+
+enum ContentType {
+  PAGE
+  POST
+  FAQ
+  ANNOUNCEMENT
+  BANNER
+  POLICY
+}
+
+enum ContentStatus {
+  DRAFT
+  PUBLISHED
+  SCHEDULED
+}
+
+model MenuItem {
+  id       String     @id @default(cuid())
+  menu     MenuName
+  label    String
+  url      String
+  position Int        @default(0)
+  visible  Boolean    @default(true)
+  parentId String?
+  parent   MenuItem?  @relation("MenuTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children MenuItem[] @relation("MenuTree")
+
+  @@index([menu, position])
+}
+
+enum MenuName {
+  HEADER
+  FOOTER
+}
+
+// Uploaded media, independent of any product. ProductMedia stays as the
+// ordered gallery for one product; this is the library those URLs come from.
+model MediaAsset {
+  id        String    @id @default(cuid())
+  url       String    @unique
+  filename  String
+  kind      MediaKind @default(IMAGE)
+  folder    String    @default("uploads")
+  altText   String    @default("")
+  mimeType  String?
+  width     Int?
+  height    Int?
+  bytes     Int?
+  tags      String[]  @default([])
+  createdBy String?
+  createdAt DateTime  @default(now())
+
+  @@index([folder, createdAt])
+}
+
+enum MediaKind {
+  IMAGE
+  VIDEO
+  DOCUMENT
+}
+
+// Every stock movement, with the resulting level captured at write time so
+// history stays readable even after later adjustments.
+model InventoryAdjustment {
+  id        String  @id @default(cuid())
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variantId String?
+  variant   Variant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  delta     Int
+  resulting Int
+  reason    InventoryReason @default(MANUAL)
+  note      String?
+  actor     String
+  // Placeholder until multi-location lands; every row is "main" today.
+  location  String   @default("main")
+  createdAt DateTime @default(now())
+
+  @@index([productId, createdAt])
+  @@index([createdAt])
+}
+
+enum InventoryReason {
+  MANUAL
+  RECEIVED
+  SOLD
+  RETURNED
+  DAMAGED
+  CORRECTION
+  RESERVED
+  RELEASED
+}
+
+model Redirect {
+  id         String   @id @default(cuid())
+  source     String   @unique
+  destination String
+  statusCode Int      @default(301)
+  active     Boolean  @default(true)
+  // No hit counter: middleware serves these without a database, so counting
+  // would mean a write per redirect for a number nobody acts on.
+  note       String?
+  createdAt  DateTime @default(now())
+}
+
+// Key/value store for everything on the settings screens. Typed shapes live in
+// src/config/settings.ts; the database only has to hold JSON.
+model Setting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+}
+
+model AdminNotification {
+  id        String            @id @default(cuid())
+  type      NotificationType
+  level     NotificationLevel @default(INFO)
+  title     String
+  body      String?
+  link      String?
+  readAt    DateTime?
+  createdAt DateTime          @default(now())
+
+  @@index([readAt, createdAt])
+}
+
+enum NotificationType {
+  ORDER
+  LOW_STOCK
+  REFUND
+  PAYMENT_FAILED
+  CUSTOMER
+  SYSTEM
+}
+
+enum NotificationLevel {
+  INFO
+  WARNING
+  CRITICAL
 }
 
 model AuditLog {
   id        String   @id @default(cuid())
   actor     String
+  actorId   String?
   action    String
   target    String?
+  // What changed, when the action is worth more than its name.
+  meta      Json?
+  ip        String?
+  userAgent String?
   createdAt DateTime @default(now())
 
   @@index([createdAt])
+  @@index([actorId, createdAt])
+  @@index([action, createdAt])
 }

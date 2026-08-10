@@ -1,120 +1,166 @@
 import Link from 'next/link'
 import { db } from '@/lib/db'
+import { requirePagePermission, hasPermission } from '@/lib/rbac'
 import { formatUSD } from '@/lib/money'
+import { paging, pageCount, PER_PAGE } from '@/server/admin'
+import { PageHeader, Panel, Badge, toneFor, Pagination, FilterBar, SearchInput, FilterSelect, EmptyState, formatDate } from '@/components/admin/ui'
 import { OrderStatusForm } from '@/components/admin/OrderStatusForm'
 
 export const dynamic = 'force-dynamic'
+export const metadata = { title: 'Orders' }
 
-const PER_PAGE = 25
 const STATUSES = ['PENDING', 'PAID', 'FULFILLED', 'CANCELLED', 'REFUNDED'] as const
 
-export default async function AdminOrders({
-  searchParams,
-}: {
-  searchParams: Promise<{ status?: string; page?: string }>
-}) {
-  const { status, page: pageParam } = await searchParams
-  const page = Math.max(1, Number(pageParam) || 1)
-  const where = STATUSES.includes(status as (typeof STATUSES)[number])
-    ? { status: status as (typeof STATUSES)[number] }
-    : {}
+type Search = { q?: string; status?: string; flagged?: string; page?: string }
 
-  const [orders, total] = await Promise.all([
+export default async function AdminOrders({ searchParams }: { searchParams: Promise<Search> }) {
+  await requirePagePermission('orders.read')
+  const params = await searchParams
+  const { page, skip, take } = paging(params.page)
+  const mayWrite = await hasPermission('orders.write')
+
+  const where = {
+    ...(params.status && STATUSES.includes(params.status as (typeof STATUSES)[number])
+      ? { status: params.status as (typeof STATUSES)[number] }
+      : {}),
+    ...(params.flagged === '1' ? { fraudFlag: { not: null } } : {}),
+    ...(params.q
+      ? {
+          OR: [
+            { number: { contains: params.q, mode: 'insensitive' as const } },
+            { email: { contains: params.q, mode: 'insensitive' as const } },
+            { shipName: { contains: params.q, mode: 'insensitive' as const } },
+          ],
+        }
+      : {}),
+  }
+
+  const [orders, total, statusCounts] = await Promise.all([
     db.order.findMany({
       where,
       orderBy: { createdAt: 'desc' },
-      skip: (page - 1) * PER_PAGE,
-      take: PER_PAGE,
+      skip,
+      take,
       select: {
         number: true,
         email: true,
         status: true,
         totalCents: true,
+        refundedCents: true,
         createdAt: true,
         shipCity: true,
         shipState: true,
+        fraudFlag: true,
+        trackingNumber: true,
         _count: { select: { items: true } },
       },
     }),
     db.order.count({ where }),
+    db.order.groupBy({ by: ['status'], _count: true }),
   ])
 
-  const pageCount = Math.max(1, Math.ceil(total / PER_PAGE))
+  const counts = Object.fromEntries(statusCounts.map((row) => [row.status, row._count]))
+  const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value) as [string, string][])
+  const hrefFor = (next: number) => {
+    const clone = new URLSearchParams(query)
+    clone.set('page', String(next))
+    return `/admin/orders?${clone}`
+  }
 
   return (
     <>
-      <h1 className="text-2xl">Orders</h1>
+      <PageHeader title="Orders" description={`${total} matching orders`} />
 
-      <nav aria-label="Filter by status" className="mt-4 flex flex-wrap gap-3 text-xs uppercase tracking-wider">
-        <Link href="/admin/orders" className={!where.status ? 'text-rose-500' : 'text-plum-500 hover:text-rose-500'}>
+      <nav aria-label="Filter by status" className="admin-scroll mb-3 flex gap-1.5 text-xs">
+        <Link href="/admin/orders" className={`admin-btn ${!params.status ? 'admin-btn-primary' : 'admin-btn-ghost'}`}>
           All
         </Link>
-        {STATUSES.map((s) => (
+        {STATUSES.map((status) => (
           <Link
-            key={s}
-            href={`/admin/orders?status=${s}`}
-            className={where.status === s ? 'text-rose-500' : 'text-plum-500 hover:text-rose-500'}
+            key={status}
+            href={`/admin/orders?status=${status}`}
+            className={`admin-btn ${params.status === status ? 'admin-btn-primary' : 'admin-btn-ghost'}`}
           >
-            {s}
+            {status} {counts[status] ? `(${counts[status]})` : ''}
           </Link>
         ))}
+        <Link href="/admin/orders?flagged=1" className={`admin-btn ${params.flagged ? 'admin-btn-primary' : 'admin-btn-ghost'}`}>
+          Flagged
+        </Link>
       </nav>
 
-      <p className="mt-3 text-sm text-plum-500">{total} orders</p>
+      <Panel bodyClassName="p-0">
+        <FilterBar action="/admin/orders">
+          <SearchInput defaultValue={params.q ?? ''} label="Search" placeholder="Order number, email, name" />
+          <FilterSelect
+            name="status"
+            label="Status"
+            value={params.status}
+            options={[{ value: '', label: 'Any status' }, ...STATUSES.map((status) => ({ value: status, label: status }))]}
+          />
+        </FilterBar>
 
-      <div className="mt-5 overflow-x-auto">
-        <table className="w-full min-w-[44rem] text-sm">
-          <thead>
-            <tr className="border-b border-line text-left text-xs uppercase tracking-wider text-plum-500">
-              <th scope="col" className="py-2 font-normal">Order</th>
-              <th scope="col" className="py-2 font-normal">Customer</th>
-              <th scope="col" className="py-2 font-normal">Ships to</th>
-              <th scope="col" className="py-2 font-normal">Items</th>
-              <th scope="col" className="py-2 font-normal">Total</th>
-              <th scope="col" className="py-2 font-normal">Status</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-line">
-            {orders.map((order) => (
-              <tr key={order.number}>
-                <td className="py-2.5 pr-4">
-                  <p className="font-medium">{order.number}</p>
-                  <p className="text-xs text-plum-300">{order.createdAt.toLocaleDateString('en-US')}</p>
-                </td>
-                <td className="max-w-[13rem] truncate py-2.5 pr-4 text-plum-500">{order.email}</td>
-                <td className="py-2.5 pr-4 text-plum-500">
-                  {order.shipCity}, {order.shipState}
-                </td>
-                <td className="py-2.5 pr-4">{order._count.items}</td>
-                <td className="py-2.5 pr-4">{formatUSD(order.totalCents)}</td>
-                <td className="py-2.5">
-                  <OrderStatusForm number={order.number} status={order.status} statuses={[...STATUSES]} />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+        {orders.length === 0 ? (
+          <EmptyState title="No orders here" description="Try a different filter or search." />
+        ) : (
+          <div className="admin-scroll">
+            <table className="admin-table w-full min-w-[52rem]">
+              <thead className="border-b border-[var(--admin-line)]">
+                <tr>
+                  <th scope="col">Order</th>
+                  <th scope="col">Customer</th>
+                  <th scope="col">Ships to</th>
+                  <th scope="col" className="text-right">
+                    Items
+                  </th>
+                  <th scope="col" className="text-right">
+                    Total
+                  </th>
+                  <th scope="col">Status</th>
+                  <th scope="col">
+                    <span className="sr-only">Change status</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--admin-line)]">
+                {orders.map((order) => (
+                  <tr key={order.number}>
+                    <td>
+                      <Link href={`/admin/orders/${order.number}`} className="font-medium hover:text-[var(--admin-accent)]">
+                        {order.number}
+                      </Link>
+                      <span className="block text-xs text-[var(--admin-muted)]">{formatDate(order.createdAt)}</span>
+                      {order.fraudFlag && (
+                        <Badge tone="danger">
+                          <span title={order.fraudFlag}>Flagged</span>
+                        </Badge>
+                      )}
+                    </td>
+                    <td className="max-w-48 truncate text-[var(--admin-muted)]">{order.email}</td>
+                    <td className="text-[var(--admin-muted)]">
+                      {order.shipCity}, {order.shipState}
+                      {order.trackingNumber && <span className="block text-xs">Tracked</span>}
+                    </td>
+                    <td className="text-right tabular-nums">{order._count.items}</td>
+                    <td className="text-right tabular-nums">
+                      {formatUSD(order.totalCents)}
+                      {order.refundedCents > 0 && (
+                        <span className="block text-xs text-[var(--color-danger)]">−{formatUSD(order.refundedCents)}</span>
+                      )}
+                    </td>
+                    <td>
+                      <Badge tone={toneFor(order.status)}>{order.status}</Badge>
+                    </td>
+                    <td>{mayWrite && <OrderStatusForm number={order.number} status={order.status} statuses={[...STATUSES]} />}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
-      {orders.length === 0 && <p className="py-10 text-center text-sm text-plum-500">No orders here.</p>}
-
-      {pageCount > 1 && (
-        <nav aria-label="Pagination" className="mt-8 flex items-center justify-center gap-3 text-sm">
-          {page > 1 && (
-            <Link href={`/admin/orders?page=${page - 1}`} className="link-underline">
-              Previous
-            </Link>
-          )}
-          <span className="text-plum-500">
-            Page {page} of {pageCount}
-          </span>
-          {page < pageCount && (
-            <Link href={`/admin/orders?page=${page + 1}`} className="link-underline">
-              Next
-            </Link>
-          )}
-        </nav>
-      )}
+        <Pagination page={page} pages={pageCount(total, PER_PAGE)} hrefFor={hrefFor} total={total} noun="orders" />
+      </Panel>
     </>
   )
 }

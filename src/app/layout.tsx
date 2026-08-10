@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next'
+import { headers } from 'next/headers'
 import { Cormorant_Garamond, Karla } from 'next/font/google'
 import './globals.css'
 import { site } from '@/config/site'
@@ -36,8 +37,21 @@ export const viewport: Viewport = {
   initialScale: 1,
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const org = jsonLd(organizationSchema())
+
+  // The admin is a different product on the same origin: no storefront header,
+  // footer, cart, age gate, or organisation schema. Middleware sets x-pathname
+  // because a layout cannot read the URL — the alternative was moving every
+  // storefront route into a group just to give the admin its own root.
+  const pathname = (await headers()).get('x-pathname') ?? ''
+  if (pathname.startsWith('/admin')) {
+    return (
+      <html lang="en" className={`${display.variable} ${body.variable}`}>
+        <body>{children}</body>
+      </html>
+    )
+  }
 
   return (
     <html lang="en" className={`${display.variable} ${body.variable}`}>

@@ -1,36 +1,63 @@
-import Link from 'next/link'
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
-import { currentUser } from '@/lib/auth'
+import { db } from '@/lib/db'
+import { currentAdmin, can, ADMIN_IDLE_TIMEOUT_SECONDS } from '@/lib/rbac'
+import { sessionAgeSeconds } from '@/lib/auth'
+import { ADMIN_NAV } from '@/config/admin-nav'
+import { navBadges } from '@/server/admin'
+import { AdminShell } from '@/components/admin/Shell'
+import { Breadcrumbs } from '@/components/admin/Breadcrumbs'
 
 export const dynamic = 'force-dynamic'
 
-const nav = [
-  { href: '/admin', label: 'Dashboard' },
-  { href: '/admin/products', label: 'Products' },
-  { href: '/admin/orders', label: 'Orders' },
-]
+// The admin must never be indexed, linked, or previewed anywhere.
+export const metadata: Metadata = {
+  title: { default: 'Admin', template: '%s · Intimate Bunnie Admin' },
+  robots: { index: false, follow: false, nocache: true },
+}
+
+// Set before paint so the dark theme never flashes light on load. Inline
+// because a stylesheet cannot read localStorage and React runs too late.
+const THEME_BOOTSTRAP = `(function(){try{var t=localStorage.getItem('ib_admin_theme');if(!t||t==='system'){t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}document.documentElement.setAttribute('data-admin-theme',t)}catch(e){}})()`
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  // Authorization lives on the server. There is no client-side admin check to
-  // bypass, and no admin data is fetched before this gate.
-  const user = await currentUser().catch(() => null)
-  if (!user) redirect('/account/login')
-  if (user.role !== 'ADMIN') redirect('/')
+  // Authorization is server-side and happens before any admin data is read.
+  // There is no client-side admin check anywhere to bypass.
+  const admin = await currentAdmin()
+  if (!admin) redirect('/account/login?next=/admin')
+
+  const age = await sessionAgeSeconds()
+  if (age === null || age > ADMIN_IDLE_TIMEOUT_SECONDS) redirect('/account/login?next=/admin&timeout=1')
+
+  // A section nobody can open is never rendered. The permission check on each
+  // page is still the real gate — this only stops the nav lying.
+  const nav = ADMIN_NAV.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => can(admin.permissions, item.permission)),
+  })).filter((group) => group.items.length > 0)
+
+  const [badges, notifications] = await Promise.all([
+    navBadges(),
+    db.adminNotification.findMany({
+      where: { readAt: null },
+      orderBy: { createdAt: 'desc' },
+      take: 8,
+      select: { id: true, title: true, body: true, link: true, level: true, createdAt: true },
+    }),
+  ])
 
   return (
-    <div className="container-ib grid gap-10 py-10 lg:grid-cols-[12rem_1fr]">
-      <aside>
-        <p className="eyebrow mb-3">Admin</p>
-        <nav aria-label="Admin" className="space-y-1">
-          {nav.map((item) => (
-            <Link key={item.href} href={item.href} className="block py-1.5 text-sm text-plum-700 hover:text-rose-500">
-              {item.label}
-            </Link>
-          ))}
-        </nav>
-        <p className="mt-8 text-xs text-plum-300">Signed in as {user.email}</p>
-      </aside>
-      <div className="min-w-0">{children}</div>
-    </div>
+    <>
+      <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
+      <AdminShell
+        nav={nav}
+        badges={badges}
+        actor={{ name: admin.name, email: admin.email, roleName: admin.roleName }}
+        notifications={notifications.map((item) => ({ ...item, createdAt: item.createdAt.toISOString() }))}
+      >
+        <Breadcrumbs />
+        {children}
+      </AdminShell>
+    </>
   )
 }

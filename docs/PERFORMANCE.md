@@ -33,11 +33,34 @@ OpenNext adapter, then application code — which is a small share of the total.
 
 ## Client JavaScript
 
-103 kB shared across all routes; the heaviest page (product detail) adds 4.2 kB.
+Storefront routes land at **124–127 kB** first load. Admin routes run 129–141 kB;
+the product editor is the heaviest at 141 kB, and it is the one screen where a
+rich client is the point.
 
 Kept there by defaulting to Server Components. Product cards, grids, category
 pages, filters, and pagination are all server-rendered — filters and paging are
 plain links, so a 24-product grid ships one client component: the wishlist heart.
+Every admin *page* is a Server Component too; only the shell and form plumbing
+are client-side.
+
+The admin costs the storefront one thing: its `.admin-*` component classes sit in
+the same `globals.css`, so storefront visitors download roughly 3 kB of CSS they
+never use. Splitting it out would not help much — Tailwind emits every utility
+into the file that holds `@import 'tailwindcss'`, so only the hand-written
+component layer could move.
+
+### Admin-specific choices
+
+- **No chart library.** Charts are inline SVG rendered on the server; a charting
+  package is 40–120 kB of client JavaScript to draw shapes React can describe.
+- **No windowing library.** Long tables use `content-visibility: auto` with
+  `contain-intrinsic-size`, which is the browser's own row skipping.
+- **No rich-text package.** `contenteditable` plus `document.execCommand` in
+  ~90 lines, against 100–300 kB for an editor.
+- **No PDF or XLSX writer.** Print-to-PDF is the browser's; Excel opens a CSV
+  with a BOM.
+- **Bulk selection lives in the DOM**, not React state, so ticking a box in a
+  500-row table is one re-render rather than five hundred.
 
 ## Images
 
@@ -54,6 +77,14 @@ Explicit `select` on every query, no `SELECT *`. Card queries omit
 `description`. Pagination is 24 storefront / 25 admin, with `findMany` and
 `count` issued concurrently. Related products and autocomplete are capped. The
 admin filters and pages in Postgres — the browser never holds the catalog.
+
+Admin aggregates (daily revenue, top products, top categories, stock value,
+low-stock counts) are computed in Postgres with `date_trunc` and filtered
+aggregates, not by reading rows into JavaScript. The dashboard issues its
+fourteen queries in one `Promise.all`.
+
+Global search only queries above two characters, debounced at 180 ms, and skips
+each record type the caller has no permission to read.
 
 ## Rendering
 

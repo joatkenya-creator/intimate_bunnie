@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { useActionState } from 'react'
 import { useFormStatus } from 'react-dom'
 import { login, register, type AuthState } from '@/actions/auth'
@@ -17,9 +18,19 @@ function Submit({ label }: { label: string }) {
 export function AuthForm({ mode }: { mode: 'login' | 'register' }) {
   const isRegister = mode === 'register'
   const [state, action] = useActionState<AuthState, FormData>(isRegister ? register : login, {})
+  // Set when a guard bounced someone here — admin routes send ?next=/admin.
+  const params = useSearchParams()
+  const next = params.get('next') ?? ''
 
   return (
     <form action={action} className="mt-8 space-y-5">
+      {next && <input type="hidden" name="next" value={next} />}
+      {params.get('timeout') && (
+        <p role="status" className="border border-peach-300 bg-peach-50 px-3 py-2 text-sm text-plum-700">
+          Your admin session timed out. Sign in again to continue.
+        </p>
+      )}
+
       {isRegister && (
         <div>
           <label htmlFor="name" className="mb-1.5 block text-sm">
@@ -49,7 +60,15 @@ export function AuthForm({ mode }: { mode: 'login' | 'register' }) {
           autoComplete={isRegister ? 'new-password' : 'current-password'}
           className="field"
         />
-        {isRegister && <p className="mt-1.5 text-xs text-plum-500">At least 8 characters.</p>}
+        {isRegister ? (
+          <p className="mt-1.5 text-xs text-plum-500">At least 8 characters.</p>
+        ) : (
+          <p className="mt-1.5 text-xs">
+            <Link href="/account/forgot" className="link-underline text-plum-500">
+              Forgot your password?
+            </Link>
+          </p>
+        )}
       </div>
 
       {state.error && (

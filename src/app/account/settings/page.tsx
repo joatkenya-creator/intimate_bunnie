@@ -1,0 +1,49 @@
+import type { Metadata } from 'next'
+import Link from 'next/link'
+import { redirect } from 'next/navigation'
+import { currentUser } from '@/lib/auth'
+import { db } from '@/lib/db'
+import { ProfileForm } from '@/components/account/ProfileForm'
+import { pageMetadata } from '@/lib/seo'
+
+export const dynamic = 'force-dynamic'
+
+export const metadata: Metadata = pageMetadata({
+  title: 'Your details',
+  description: 'Update the name and email on your Intimate Bunnie account.',
+  path: '/account/settings',
+  noindex: true,
+})
+
+export default async function SettingsPage() {
+  const user = await currentUser().catch(() => null)
+  if (!user) redirect('/account/login')
+
+  const { emailVerifiedAt } = (await db.user.findUniqueOrThrow({
+    where: { id: user.id },
+    select: { emailVerifiedAt: true },
+  }))
+
+  return (
+    <div className="container-ib max-w-md py-16">
+      <p className="eyebrow">Account</p>
+      <h1 className="mt-2 text-3xl">Your details</h1>
+
+      {!emailVerifiedAt && (
+        <p className="mt-6 border border-line bg-peach-50 px-4 py-3 text-sm">
+          Your email is not confirmed yet. Check your inbox for the link we sent when you signed up.
+        </p>
+      )}
+
+      <ProfileForm name={user.name} email={user.email} />
+
+      <p className="mt-10 border-t border-line pt-6 text-sm text-plum-500">
+        Changing your password?{' '}
+        <Link href="/account/forgot" className="link-underline text-plum-900">
+          Send yourself a reset link
+        </Link>
+        .
+      </p>
+    </div>
+  )
+}
