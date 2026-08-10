@@ -9,9 +9,11 @@
 | Fail | > 2.5 MiB |
 | Hard failure | ≥ 3.0 MiB |
 
-**Measured: 2993.23 KiB gzip** (12368.12 KiB raw) — **Fail band, and 7 KiB under
-the 3.0 MiB hard ceiling.** It deploys today. The next non-trivial addition may
-not.
+**Measured: 2879.52 KiB gzip** (12115.95 KiB raw) — over the 2.5 MiB target, with
+191 KiB under the 3.0 MiB hard ceiling. Watch it on every server-side change.
+
+Was 2993.23 KiB with 7 KiB of headroom until the client switched to
+`engineType = "client"`.
 
 Measure with `npm run cf:size` and read the `gzip` figure from `Total Upload`.
 That is the number Cloudflare enforces.
@@ -23,16 +25,27 @@ the schema had no `runtime = "workerd"` — before the WASM query engine existed
 the build at all. `37cf3e9` introduced it to fix a production outage
 (`fs.readdir is not implemented` in workerd), and nobody re-measured.
 
-Splitting today's number by where the bytes actually are:
+Splitting the number by where the bytes actually are:
 
 | | gzip |
 | --- | --- |
-| Prisma query engine WASM, ×2 | 1728.5 KiB |
-| Everything else — Next runtime, React, app code | 1264.7 KiB |
+| Prisma WASM, ×2 | 1459.8 KiB |
+| Everything else — Next runtime, React, app code | 1419.7 KiB |
 
-Against 1256.5 KiB total at `6a8eb25`, the non-WASM half has grown about 8 KiB
-across the whole storefront-plus-admin build. **The increase is the WASM engine,
-not application code.**
+Against 1256.5 KiB total at `6a8eb25`, application code is a small share of the
+growth. **The increase is the WASM, not the storefront or the admin.**
+
+### What `engineType = "client"` changed
+
+The generator now emits `query_compiler_bg.wasm` (1904.6 KiB raw / 729.9 KiB
+gzip) instead of `query_engine_bg.wasm` (2243.8 KiB / 864.2 KiB): Prisma calls
+compile to SQL and go to the driver adapter, with no Rust query engine. It is not
+a preview feature — `queryCompiler` and `driverAdapters` are *deprecated as
+preview flags* in 6.19.3 because the functionality graduated.
+
+It saved 113.7 KiB gzip, less than 2 × 134.3 because the compiler path carries
+more JavaScript. It does **not** fix the duplication; it makes the duplicated
+thing smaller.
 
 ### Why it is duplicated
 
@@ -53,9 +66,15 @@ a route handler and the database: `/api/redirects` (middleware fetches it),
 `/api/wishlist` (a `sendBeacon` target), `/api/admin/export` (needs
 `content-disposition`), and `/api/admin/cron` (called by an external scheduler).
 
-The structural fix is Prisma's `queryCompiler` preview feature, which replaces
-the query engine outright. It is a preview feature on the production data path,
-so it needs a deliberate decision and a full re-test — not a drive-by change.
+Switching to the query compiler shrank each copy but left the duplication in
+place. Removing it outright needs either Turbopack to share assets across module
+layers, or the WASM to be uploaded once as a Cloudflare module binding and
+instantiated at runtime instead of imported — which means patching generated
+code that `prisma generate` overwrites.
+
+Until then this is a watch item, not a solved one. `npm run cf:size` before any
+server-side change, and re-measure after every Prisma upgrade: a larger compiler
+would eat the remaining 191 KiB without a line of application code changing.
 
 ### What is in it
 
