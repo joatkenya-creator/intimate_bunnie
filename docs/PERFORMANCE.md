@@ -9,28 +9,53 @@
 | Fail | > 2.5 MiB |
 | Hard failure | ≥ 3.0 MiB |
 
-**Measured: 2993.23 KiB gzip** (12368.12 KiB raw) after the admin shipped —
-**Fail band, and 7 KiB under the 3.0 MiB hard ceiling.** It deploys today. The
-next non-trivial addition may not.
-
-Previously 1256.46 KiB gzip (6213.81 KiB raw), before the admin.
+**Measured: 2993.23 KiB gzip** (12368.12 KiB raw) — **Fail band, and 7 KiB under
+the 3.0 MiB hard ceiling.** It deploys today. The next non-trivial addition may
+not.
 
 Measure with `npm run cf:size` and read the `gzip` figure from `Total Upload`.
 That is the number Cloudflare enforces.
 
-### The first thing to look at
+### Where it went
 
-The Prisma WASM query engine is in the bundle **twice**, 2243.8 KiB each:
+The 1256.46 KiB figure this file used to quote was measured at `6a8eb25`, when
+the schema had no `runtime = "workerd"` — before the WASM query engine existed in
+the build at all. `37cf3e9` introduced it to fix a production outage
+(`fs.readdir is not implemented` in workerd), and nobody re-measured.
 
+Splitting today's number by where the bytes actually are:
+
+| | gzip |
+| --- | --- |
+| Prisma query engine WASM, ×2 | 1728.5 KiB |
+| Everything else — Next runtime, React, app code | 1264.7 KiB |
+
+Against 1256.5 KiB total at `6a8eb25`, the non-WASM half has grown about 8 KiB
+across the whole storefront-plus-admin build. **The increase is the WASM engine,
+not application code.**
+
+### Why it is duplicated
+
+`src/generated/prisma/internal/class.ts` reaches it through a relative dynamic
+import:
+
+```ts
+const { default: module } = await import('./query_engine_bg.wasm?module')
 ```
-.open-next/server-functions/default/.next/server/chunks/ssr/…query_engine_bg…wasm
-.open-next/server-functions/default/.next/server/chunks/…query_engine_bg…wasm
-```
 
-WASM barely compresses, so that duplication is a large share of the total. One
-copy served from a shared chunk is the single biggest available win — worth
-confirming before shaving anything else, because everything else is Next's own
-runtime.
+Turbopack builds the RSC layer and the route-handler layer as separate module
+graphs, so each emits its own copy — `chunks/ssr/…wasm` and `chunks/…wasm`,
+byte-identical, same content hash. `serverExternalPackages` cannot help: it
+applies to node_modules packages, and this is generated into our own source tree.
+
+Confining Prisma to one layer would fix it, but four handlers genuinely need both
+a route handler and the database: `/api/redirects` (middleware fetches it),
+`/api/wishlist` (a `sendBeacon` target), `/api/admin/export` (needs
+`content-disposition`), and `/api/admin/cron` (called by an external scheduler).
+
+The structural fix is Prisma's `queryCompiler` preview feature, which replaces
+the query engine outright. It is a preview feature on the production data path,
+so it needs a deliberate decision and a full re-test — not a drive-by change.
 
 ### What is in it
 
