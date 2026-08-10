@@ -6,6 +6,7 @@ import { logout } from '@/actions/auth'
 import { db } from '@/lib/db'
 import { formatUSD } from '@/lib/money'
 import { pageMetadata } from '@/lib/seo'
+import { isStaffRole } from '@/lib/permissions'
 
 export const dynamic = 'force-dynamic'
 
@@ -42,10 +43,14 @@ export default async function AccountPage() {
         </form>
       </div>
 
-      {user.role === 'ADMIN' && (
+      {/* Every access level that can open the admin, not just ADMIN — a Super
+          Administrator needs this link most of all. */}
+      {isStaffRole(user.role) && (
         <Link href="/admin" className="mt-8 block border border-line bg-peach-50 px-5 py-4 hover:border-peach-400">
           <p className="text-sm font-medium">Admin dashboard →</p>
-          <p className="mt-0.5 text-xs text-plum-500">Products, orders, and inventory.</p>
+          <p className="mt-0.5 text-xs text-plum-500">
+            Products, orders, inventory, customers, and content.
+          </p>
         </Link>
       )}
 

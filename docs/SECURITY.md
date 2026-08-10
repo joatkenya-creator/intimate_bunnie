@@ -33,9 +33,22 @@ otherwise editing the role that grants `staff.write` could lock the store out of
 its own admin. Staff cannot demote, block, or revoke themselves, and only a
 super administrator can grant or revoke that level.
 
-Admin sessions time out on idle after `ADMIN_SESSION_TIMEOUT_MINUTES` (default
-60), separately from the 30-day storefront cookie. A session with no `iat` claim
-reads as unknown age and is asked to sign in again.
+Admin sessions time out after `ADMIN_SESSION_TIMEOUT_MINUTES` (default 60) of
+inactivity, separately from the 30-day storefront cookie. It is a sliding window:
+middleware re-issues the cookie with a fresh `iat` on any `/admin` request past
+the halfway mark, so activity extends the session and idleness ends it.
+
+Three properties keep that from weakening the control:
+
+- Middleware only extends; `requirePermission()` is still the gate, checked
+  server-side on every page and every action.
+- A session already past the window is never refreshed, so the timeout is always
+  reachable.
+- A session with no `iat` claim reads as unknown age, is never refreshed, and is
+  asked to sign in again — backfilling one would resurrect a cookie of any age.
+
+Storefront requests do not extend it; the window exists to cover an unattended
+admin screen.
 
 Customer routes call `currentUser()` server-side and redirect. No client-side
 route guard is load-bearing anywhere.

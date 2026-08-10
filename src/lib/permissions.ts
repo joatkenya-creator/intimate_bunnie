@@ -62,6 +62,18 @@ export const RESOURCE_LABELS: Record<Resource, string> = {
 }
 
 /**
+ * The access levels that can open the admin at all. Kept here rather than
+ * spelled out at each call site: widening the `Role` enum once already left a
+ * `role === 'ADMIN'` check behind that silently hid the admin link from Super
+ * Administrators.
+ */
+export const STAFF_ROLES = ['STAFF', 'ADMIN', 'SUPER_ADMIN'] as const
+
+export function isStaffRole(role: string | null | undefined): boolean {
+  return STAFF_ROLES.includes(role as (typeof STAFF_ROLES)[number])
+}
+
+/**
  * Does this permission set satisfy `needed`? Checks the three grants that can
  * cover it — the exact one, the resource wildcard, and the global wildcard.
  */

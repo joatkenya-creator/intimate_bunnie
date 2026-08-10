@@ -116,41 +116,37 @@ export default async function AdminCollections({ searchParams }: { searchParams:
         <Panel title={editing ? `Edit ${editing.name}` : 'New collection'}>
           {mayWrite ? (
             <AdminForm action={saveCollection} key={editing?.id ?? 'new'}>
-              {(state) => (
-                <>
-                  {editing && <input type="hidden" name="id" value={editing.id} />}
-                  <TextField label="Name" name="name" defaultValue={editing?.name} required error={state.fieldErrors?.name} />
-                  <TextField label="Slug" name="slug" defaultValue={editing?.slug} hint="Leave blank to generate." />
-                  <TextArea label="Description" name="description" rows={2} defaultValue={editing?.description} />
-                  <TextField label="Hero image URL" name="heroImage" defaultValue={editing?.heroImage ?? ''} />
+              {editing && <input type="hidden" name="id" value={editing.id} />}
+              <TextField label="Name" name="name" defaultValue={editing?.name} required />
+              <TextField label="Slug" name="slug" defaultValue={editing?.slug} hint="Leave blank to generate." />
+              <TextArea label="Description" name="description" rows={2} defaultValue={editing?.description} />
+              <TextField label="Hero image URL" name="heroImage" defaultValue={editing?.heroImage ?? ''} />
 
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <TextField label="Starts at" name="startsAt" type="datetime-local" defaultValue={editing?.startsAt?.toISOString().slice(0, 16) ?? ''} />
-                    <TextField label="Ends at" name="endsAt" type="datetime-local" defaultValue={editing?.endsAt?.toISOString().slice(0, 16) ?? ''} />
-                  </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <TextField label="Starts at" name="startsAt" type="datetime-local" defaultValue={editing?.startsAt?.toISOString().slice(0, 16) ?? ''} />
+                <TextField label="Ends at" name="endsAt" type="datetime-local" defaultValue={editing?.endsAt?.toISOString().slice(0, 16) ?? ''} />
+              </div>
 
-                  <CollectionRules
-                    automatic={editing?.automatic ?? false}
-                    rules={(editing?.rules as { match: 'all' | 'any'; conditions: { field: string; operator: string; value: string }[] } | null) ?? null}
-                  />
+              <CollectionRules
+                automatic={editing?.automatic ?? false}
+                rules={(editing?.rules as { match: 'all' | 'any'; conditions: { field: string; operator: string; value: string }[] } | null) ?? null}
+              />
 
-                  <CheckboxList
-                    legend="Members (manual collections only)"
-                    name="productIds"
-                    options={products.map((product) => ({ value: product.id, label: product.name }))}
-                    selected={editing?.products.map((product) => product.id) ?? []}
-                  />
+              <CheckboxList
+                legend="Members (manual collections only)"
+                name="productIds"
+                options={products.map((product) => ({ value: product.id, label: product.name }))}
+                selected={editing?.products.map((product) => product.id) ?? []}
+              />
 
-                  <TextField label="Position" name="position" type="number" defaultValue={editing?.position ?? 0} />
-                  <TextField label="Meta title" name="seoTitle" defaultValue={editing?.seoTitle ?? ''} />
-                  <TextArea label="Meta description" name="seoDesc" rows={2} defaultValue={editing?.seoDesc ?? ''} />
-                  <Toggle label="Featured" name="featured" defaultChecked={editing?.featured} />
-                  {editing && (
-                    <Link href="/admin/collections" className="block text-xs text-[var(--admin-accent)]">
-                      Cancel and start a new one
-                    </Link>
-                  )}
-                </>
+              <TextField label="Position" name="position" type="number" defaultValue={editing?.position ?? 0} />
+              <TextField label="Meta title" name="seoTitle" defaultValue={editing?.seoTitle ?? ''} />
+              <TextArea label="Meta description" name="seoDesc" rows={2} defaultValue={editing?.seoDesc ?? ''} />
+              <Toggle label="Featured" name="featured" defaultChecked={editing?.featured} />
+              {editing && (
+                <Link href="/admin/collections" className="block text-xs text-[var(--admin-accent)]">
+                  Cancel and start a new one
+                </Link>
               )}
             </AdminForm>
           ) : (

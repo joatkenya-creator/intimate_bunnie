@@ -75,7 +75,7 @@ React's `cache()`. Prisma reaches Postgres through `@prisma/adapter-neon`.
 ## Middleware
 
 `src/middleware.ts` is the only place that sees every request before routing, so
-it carries the three things that must not be per-page opt-ins:
+it carries the four things that must not be per-page opt-ins:
 
 1. **`x-pathname`** — the root layout reads it to drop storefront chrome on
    `/admin`. A layout cannot read the URL, and the alternative was moving every
@@ -86,6 +86,15 @@ it carries the three things that must not be per-page opt-ins:
    active map from `/api/redirects` once per isolate per minute. That same
    request runs the scheduled-publish sweep, which is how scheduling works with
    no cron binding.
+4. **Admin session refresh** — re-issues the session cookie past the halfway mark
+   of the idle window, which turns a hard expiry into a sliding one. A Server
+   Component cannot set a cookie, and the admin is nearly all pages, so this is
+   the only layer that sees enough of the traffic to do it.
+
+`src/lib/session.ts` exists for that last point: token signing and verification
+with no `next/headers` import, so both `lib/auth.ts` (cookie jar) and middleware
+(request/response cookies) share one implementation. A `server-only` module
+cannot be imported into middleware.
 
 ## Rendering
 

@@ -1,9 +1,20 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { can, ALL_PERMISSIONS, SYSTEM_ROLES } from '../src/lib/permissions.ts'
+import { can, ALL_PERMISSIONS, SYSTEM_ROLES, isStaffRole } from '../src/lib/permissions.ts'
 
 // The permission check is the gate in front of every admin write. A wrong
 // answer here is either a locked-out owner or an open door.
+
+// Widening the Role enum once left a `role === 'ADMIN'` check behind, which
+// silently hid the admin link from the one account that most needed it.
+test('every access level above customer counts as staff', () => {
+  assert.equal(isStaffRole('STAFF'), true)
+  assert.equal(isStaffRole('ADMIN'), true)
+  assert.equal(isStaffRole('SUPER_ADMIN'), true)
+  assert.equal(isStaffRole('CUSTOMER'), false)
+  assert.equal(isStaffRole(null), false)
+  assert.equal(isStaffRole(undefined), false)
+})
 
 test('an exact grant matches only itself', () => {
   assert.equal(can(['products.write'], 'products.write'), true)

@@ -122,35 +122,31 @@ export default async function AdminCategories({ searchParams }: { searchParams: 
         <Panel title={editing ? `Edit ${editing.name}` : 'New category'}>
           {mayWrite ? (
             <AdminForm action={saveCategory} key={editing?.id ?? 'new'}>
-              {(state) => (
-                <>
-                  {editing && <input type="hidden" name="id" value={editing.id} />}
-                  <TextField label="Name" name="name" defaultValue={editing?.name} required error={state.fieldErrors?.name} />
-                  <TextField label="Slug" name="slug" defaultValue={editing?.slug} hint="Leave blank to generate." />
-                  <SelectField
-                    label="Parent"
-                    name="parentId"
-                    defaultValue={editing?.parentId ?? ''}
-                    options={[
-                      { value: '', label: 'Top level' },
-                      ...categories
-                        .filter((category) => !category.parentId && category.id !== editing?.id)
-                        .map((category) => ({ value: category.id, label: category.name })),
-                    ]}
-                  />
-                  <TextArea label="Description" name="description" rows={3} defaultValue={editing?.description} />
-                  <TextField label="Hero image URL" name="heroImage" defaultValue={editing?.heroImage ?? ''} />
-                  <TextField label="Position" name="position" type="number" defaultValue={editing?.position ?? 0} />
-                  <TextField label="Meta title" name="seoTitle" defaultValue={editing?.seoTitle ?? ''} />
-                  <TextArea label="Meta description" name="seoDesc" rows={2} defaultValue={editing?.seoDesc ?? ''} />
-                  <Toggle label="Visible" name="visible" defaultChecked={editing ? editing.visible : true} hint="Hidden categories keep their URL but leave the nav." />
-                  <Toggle label="Featured" name="featured" defaultChecked={editing?.featured} />
-                  {editing && (
-                    <Link href="/admin/categories" className="block text-xs text-[var(--admin-accent)]">
-                      Cancel and start a new one
-                    </Link>
-                  )}
-                </>
+              {editing && <input type="hidden" name="id" value={editing.id} />}
+              <TextField label="Name" name="name" defaultValue={editing?.name} required />
+              <TextField label="Slug" name="slug" defaultValue={editing?.slug} hint="Leave blank to generate." />
+              <SelectField
+                label="Parent"
+                name="parentId"
+                defaultValue={editing?.parentId ?? ''}
+                options={[
+                  { value: '', label: 'Top level' },
+                  ...categories
+                    .filter((category) => !category.parentId && category.id !== editing?.id)
+                    .map((category) => ({ value: category.id, label: category.name })),
+                ]}
+              />
+              <TextArea label="Description" name="description" rows={3} defaultValue={editing?.description} />
+              <TextField label="Hero image URL" name="heroImage" defaultValue={editing?.heroImage ?? ''} />
+              <TextField label="Position" name="position" type="number" defaultValue={editing?.position ?? 0} />
+              <TextField label="Meta title" name="seoTitle" defaultValue={editing?.seoTitle ?? ''} />
+              <TextArea label="Meta description" name="seoDesc" rows={2} defaultValue={editing?.seoDesc ?? ''} />
+              <Toggle label="Visible" name="visible" defaultChecked={editing ? editing.visible : true} hint="Hidden categories keep their URL but leave the nav." />
+              <Toggle label="Featured" name="featured" defaultChecked={editing?.featured} />
+              {editing && (
+                <Link href="/admin/categories" className="block text-xs text-[var(--admin-accent)]">
+                  Cancel and start a new one
+                </Link>
               )}
             </AdminForm>
           ) : (

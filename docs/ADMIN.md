@@ -8,18 +8,25 @@ no storefront chrome.
 
 ```bash
 npm run db:seed          # catalog (destructive — clears products)
-npm run db:seed:admin    # roles, staff, customers, orders, content, settings (additive)
+npm run db:seed:demo     # roles, settings, plus a fictional staff/customer/order set
 npm run dev
 ```
 
-Then sign in at `/account/login` with the address the admin seed printed
+Then sign in at `/account/login` with the address the seed printed
 (`owner@intimatebunnie.test` unless you set `ADMIN_EMAIL`) and open `/admin`.
 
-To promote an existing account by hand:
+**On a real store, use `npm run db:seed:admin`.** It creates the built-in roles
+and the settings defaults, gives the Administrator role to any staff account that
+has none, and invents nothing. Then promote yourself:
 
 ```sql
 UPDATE "User" SET role = 'SUPER_ADMIN' WHERE email = 'you@example.com';
 ```
+
+That SQL matters more than it looks. `role = 'ADMIN'` with no `adminRoleId`
+resolves to **zero** permissions — the account can reach `/admin` and open
+nothing. `/admin/no-access` explains that in place rather than bouncing, because
+the dashboard is permission-gated too and a redirect back to it would loop.
 
 ## Access control
 
@@ -69,10 +76,26 @@ advertised — but that is cosmetics, not security.
 
 ### Session timeout
 
-Admin sessions expire on idle after `ADMIN_SESSION_TIMEOUT_MINUTES` (default 60),
-independently of the 30-day storefront cookie. The threat is a shared laptop in a
-stockroom, not a stolen cookie. Sessions minted before `iat` existed read as
-"unknown age" and are asked to sign in again — safe by default.
+Admin sessions expire after `ADMIN_SESSION_TIMEOUT_MINUTES` (default 60) of
+**inactivity**, independently of the 30-day storefront cookie. The threat is a
+shared laptop left open in a stockroom, not a stolen cookie.
+
+It is a sliding window, not a hard cap. Any request to `/admin` or `/api/admin`
+past the halfway mark re-issues the cookie with a fresh `iat`, so working through
+a long shift never interrupts you, while an abandoned screen still locks. The
+halfway rule keeps it to at most one `Set-Cookie` per half-window rather than one
+per request.
+
+Only middleware can do this — a Server Component cannot set a cookie, and the
+admin is almost entirely pages, so a refresh anywhere else would miss ordinary
+navigation. Middleware only *extends*; `requirePermission()` still enforces the
+window server-side, and an already-expired session is never revived.
+
+Storefront browsing deliberately does not extend it. The window covers an
+unattended admin screen, and reading a product page is not admin activity.
+
+Sessions minted before `iat` existed read as "unknown age", are never refreshed,
+and are asked to sign in again — one re-login after the admin first ships.
 
 ## Layout
 

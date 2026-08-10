@@ -1,11 +1,18 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { rateLimit, clientIp } from '@/lib/security'
+import {
+  SESSION_COOKIE,
+  signSession,
+  verifySessionToken,
+  sessionCookieOptions,
+  shouldRefresh,
+} from '@/lib/session'
 
 // Middleware is the only place that sees every request before routing, so it
-// carries the three things that must not be per-page opt-ins: the pathname the
-// root layout needs, admin rate limiting, and managed redirects.
+// carries the four things that must not be per-page opt-ins: the pathname the
+// root layout needs, admin rate limiting, managed redirects, and keeping an
+// active admin session alive.
 
-const SESSION_COOKIE = 'ib_session'
 const REDIRECT_TTL_MS = 60_000
 
 let redirectCache: { at: number; map: Record<string, { destination: string; statusCode: number }> } = {
@@ -34,6 +41,31 @@ async function redirectFor(request: NextRequest, pathname: string) {
   return redirectCache.map[pathname]
 }
 
+/**
+ * Slides the admin idle window forward. Only middleware can do this: a Server
+ * Component cannot set a cookie, and the admin is almost entirely pages, so a
+ * refresh anywhere else would miss ordinary navigation.
+ *
+ * Nothing here decides whether the session is *valid* — `requirePermission()`
+ * still enforces the window server-side. This only extends a session that is
+ * demonstrably being used, and never one whose age it cannot establish.
+ */
+async function refreshAdminSession(request: NextRequest, response: NextResponse): Promise<void> {
+  const token = request.cookies.get(SESSION_COOKIE)?.value
+  if (!token) return
+
+  try {
+    const payload = await verifySessionToken(token)
+    if (!shouldRefresh(payload)) return
+
+    const refreshed = await signSession({ ...payload, iat: Math.floor(Date.now() / 1000) })
+    response.cookies.set(SESSION_COOKIE, refreshed, sessionCookieOptions())
+  } catch {
+    // A failed refresh must never block the request — the worst case is that
+    // the session times out on schedule, which is the documented behaviour.
+  }
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
   const isAdmin = pathname.startsWith('/admin') || pathname.startsWith('/api/admin')
@@ -60,6 +92,9 @@ export async function middleware(request: NextRequest) {
   }
 
   const response = NextResponse.next({ request: { headers: withPathname(request) } })
+  // Admin activity slides the idle window; storefront browsing deliberately
+  // does not, because the window exists to cover an unattended admin screen.
+  if (isAdmin) await refreshAdminSession(request, response)
   return response
 }
 

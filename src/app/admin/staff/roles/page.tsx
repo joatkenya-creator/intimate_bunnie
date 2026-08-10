@@ -93,81 +93,76 @@ export default async function AdminRoles({ searchParams }: { searchParams: Promi
             <p className="text-sm text-[var(--admin-muted)]">You have read-only access to roles.</p>
           ) : (
             <AdminForm action={saveRole} key={editing?.id ?? 'new'}>
-              {(state) => (
-                <>
-                  {editing && <input type="hidden" name="id" value={editing.id} />}
-                  <TextField
-                    label="Name"
-                    name="name"
-                    defaultValue={editing?.name}
-                    required
-                    disabled={editing?.system}
-                    error={state.fieldErrors?.name}
-                    hint={editing?.system ? 'Built-in roles keep their name; their permissions can still change.' : undefined}
-                  />
-                  <TextField label="Slug" name="slug" defaultValue={editing?.slug} disabled={editing?.system} />
-                  <TextArea label="Description" name="description" rows={2} defaultValue={editing?.description} />
-                  <SelectField
-                    label="Inherits from"
-                    name="inheritsId"
-                    defaultValue={editing?.inheritsId ?? ''}
-                    options={[
-                      { value: '', label: 'Nothing' },
-                      ...roles.filter((role) => role.id !== editing?.id).map((role) => ({ value: role.id, label: role.name })),
-                    ]}
-                    hint="Permissions from the parent are added to the ones ticked below."
-                  />
+              {editing && <input type="hidden" name="id" value={editing.id} />}
+              <TextField
+                label="Name"
+                name="name"
+                defaultValue={editing?.name}
+                required
+                disabled={editing?.system}
+                hint={editing?.system ? 'Built-in roles keep their name; their permissions can still change.' : undefined}
+              />
+              <TextField label="Slug" name="slug" defaultValue={editing?.slug} disabled={editing?.system} />
+              <TextArea label="Description" name="description" rows={2} defaultValue={editing?.description} />
+              <SelectField
+                label="Inherits from"
+                name="inheritsId"
+                defaultValue={editing?.inheritsId ?? ''}
+                options={[
+                  { value: '', label: 'Nothing' },
+                  ...roles.filter((role) => role.id !== editing?.id).map((role) => ({ value: role.id, label: role.name })),
+                ]}
+                hint="Permissions from the parent are added to the ones ticked below."
+              />
 
-                  <fieldset>
-                    <legend className="admin-label">Permissions</legend>
-                    <div className="admin-scroll max-h-96 overflow-y-auto rounded border border-[var(--admin-line)]">
-                      <table className="admin-table w-full">
-                        <thead className="sticky top-0 bg-[var(--admin-panel)]">
-                          <tr>
-                            <th scope="col">Area</th>
-                            {ACTIONS.map((action) => (
-                              <th key={action} scope="col" className="text-center">
-                                {action}
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-[var(--admin-line)]">
-                          {RESOURCES.map((resource) => (
-                            <tr key={resource}>
-                              <td className="text-xs">{RESOURCE_LABELS[resource]}</td>
-                              {ACTIONS.map((action) => {
-                                const permission = `${resource}.${action}` as const
-                                return (
-                                  <td key={action} className="text-center">
-                                    <input
-                                      type="checkbox"
-                                      name="permissions"
-                                      value={permission}
-                                      defaultChecked={can(editing?.permissions ?? [], permission)}
-                                      aria-label={`${RESOURCE_LABELS[resource]}: ${action}`}
-                                      className="size-4 accent-[var(--color-rose-500)]"
-                                    />
-                                  </td>
-                                )
-                              })}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                    <p className="mt-1 text-xs text-[var(--admin-muted)]">
-                      Ticks show what this role grants directly, including any wildcard it holds. Permissions coming from
-                      the parent role are not shown and cannot be revoked here — change the parent instead.
-                    </p>
-                  </fieldset>
+              <fieldset>
+                <legend className="admin-label">Permissions</legend>
+                <div className="admin-scroll max-h-96 overflow-y-auto rounded border border-[var(--admin-line)]">
+                  <table className="admin-table w-full">
+                    <thead className="sticky top-0 bg-[var(--admin-panel)]">
+                      <tr>
+                        <th scope="col">Area</th>
+                        {ACTIONS.map((action) => (
+                          <th key={action} scope="col" className="text-center">
+                            {action}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[var(--admin-line)]">
+                      {RESOURCES.map((resource) => (
+                        <tr key={resource}>
+                          <td className="text-xs">{RESOURCE_LABELS[resource]}</td>
+                          {ACTIONS.map((action) => {
+                            const permission = `${resource}.${action}` as const
+                            return (
+                              <td key={action} className="text-center">
+                                <input
+                                  type="checkbox"
+                                  name="permissions"
+                                  value={permission}
+                                  defaultChecked={can(editing?.permissions ?? [], permission)}
+                                  aria-label={`${RESOURCE_LABELS[resource]}: ${action}`}
+                                  className="size-4 accent-[var(--color-rose-500)]"
+                                />
+                              </td>
+                            )
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="mt-1 text-xs text-[var(--admin-muted)]">
+                  Ticks show what this role grants directly, including any wildcard it holds. Permissions coming from
+                  the parent role are not shown and cannot be revoked here — change the parent instead.
+                </p>
+              </fieldset>
 
-                  {editing && (
-                    <Link href="/admin/staff/roles" className="block text-xs text-[var(--admin-accent)]">
-                      Cancel and create a new role
-                    </Link>
-                  )}
-                </>
+              {editing && (
+                <Link href="/admin/staff/roles" className="block text-xs text-[var(--admin-accent)]">
+                  Cancel and create a new role
+                </Link>
               )}
             </AdminForm>
           )}

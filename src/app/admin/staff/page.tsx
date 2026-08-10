@@ -128,54 +128,49 @@ export default async function AdminStaff({ searchParams }: { searchParams: Promi
           <Panel title={editing ? `Edit ${editing.email}` : 'Invite or promote'}>
             {mayWrite ? (
               <AdminForm action={saveStaff} key={editing?.id ?? 'new'}>
-                {(state) => (
-                  <>
-                    {editing && <input type="hidden" name="id" value={editing.id} />}
-                    <TextField
-                      label="Email"
-                      name="email"
-                      type="email"
-                      defaultValue={editing?.email}
-                      disabled={Boolean(editing)}
-                      required={!editing}
-                      error={state.fieldErrors?.email}
-                      hint={editing ? undefined : 'An existing customer is promoted; a new address is invited.'}
-                    />
-                    <TextField label="Name" name="name" defaultValue={editing?.name ?? ''} />
-                    <SelectField
-                      label="Access level"
-                      name="role"
-                      defaultValue={editing?.role ?? 'STAFF'}
-                      options={[
-                        { value: 'STAFF', label: 'Staff' },
-                        { value: 'ADMIN', label: 'Administrator' },
-                        ...(admin.role === 'SUPER_ADMIN' ? [{ value: 'SUPER_ADMIN', label: 'Super Administrator' }] : []),
-                        { value: 'CUSTOMER', label: 'Customer — no admin access' },
-                      ]}
-                      hint="Super Administrator holds every permission unconditionally."
-                    />
-                    <SelectField
-                      label="Role"
-                      name="adminRoleId"
-                      defaultValue={editing?.adminRole?.id ?? ''}
-                      options={[{ value: '', label: 'No role — no permissions' }, ...roles.map((role) => ({ value: role.id, label: role.name }))]}
-                    />
-                    <SelectField
-                      label="Status"
-                      name="status"
-                      defaultValue={editing?.status ?? 'ACTIVE'}
-                      options={[
-                        { value: 'ACTIVE', label: 'Active' },
-                        { value: 'INVITED', label: 'Invited' },
-                        { value: 'BLOCKED', label: 'Blocked' },
-                      ]}
-                    />
-                    {editing && (
-                      <Link href="/admin/staff" className="block text-xs text-[var(--admin-accent)]">
-                        Cancel and invite someone else
-                      </Link>
-                    )}
-                  </>
+                {editing && <input type="hidden" name="id" value={editing.id} />}
+                <TextField
+                  label="Email"
+                  name="email"
+                  type="email"
+                  defaultValue={editing?.email}
+                  disabled={Boolean(editing)}
+                  required={!editing}
+                  hint={editing ? undefined : 'An existing customer is promoted; a new address is invited.'}
+                />
+                <TextField label="Name" name="name" defaultValue={editing?.name ?? ''} />
+                <SelectField
+                  label="Access level"
+                  name="role"
+                  defaultValue={editing?.role ?? 'STAFF'}
+                  options={[
+                    { value: 'STAFF', label: 'Staff' },
+                    { value: 'ADMIN', label: 'Administrator' },
+                    ...(admin.role === 'SUPER_ADMIN' ? [{ value: 'SUPER_ADMIN', label: 'Super Administrator' }] : []),
+                    { value: 'CUSTOMER', label: 'Customer — no admin access' },
+                  ]}
+                  hint="Super Administrator holds every permission unconditionally."
+                />
+                <SelectField
+                  label="Role"
+                  name="adminRoleId"
+                  defaultValue={editing?.adminRole?.id ?? ''}
+                  options={[{ value: '', label: 'No role — no permissions' }, ...roles.map((role) => ({ value: role.id, label: role.name }))]}
+                />
+                <SelectField
+                  label="Status"
+                  name="status"
+                  defaultValue={editing?.status ?? 'ACTIVE'}
+                  options={[
+                    { value: 'ACTIVE', label: 'Active' },
+                    { value: 'INVITED', label: 'Invited' },
+                    { value: 'BLOCKED', label: 'Blocked' },
+                  ]}
+                />
+                {editing && (
+                  <Link href="/admin/staff" className="block text-xs text-[var(--admin-accent)]">
+                    Cancel and invite someone else
+                  </Link>
                 )}
               </AdminForm>
             ) : (

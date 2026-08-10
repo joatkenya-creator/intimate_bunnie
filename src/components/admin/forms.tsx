@@ -1,8 +1,24 @@
 'use client'
 
-import { useActionState, useId, type ReactNode } from 'react'
+import { createContext, useActionState, useContext, useId, type ReactNode } from 'react'
 import { useFormStatus } from 'react-dom'
 import type { ActionState } from '@/lib/form'
+
+/**
+ * The last result of the surrounding AdminForm, so a field can show its own
+ * validation error without the page wiring one up.
+ *
+ * This exists because the obvious alternative — a render prop, `{(state) => …}`
+ * — cannot work here. Every admin page is a Server Component and AdminForm is a
+ * Client Component, and a function is not serialisable across that boundary:
+ * React throws while building the RSC payload, which surfaces in the browser as
+ * a bare error digest rather than anything that names the real cause.
+ */
+const FormStateContext = createContext<ActionState>({})
+
+export function useFormState(): ActionState {
+  return useContext(FormStateContext)
+}
 
 // Form plumbing shared by every admin screen. Labels are always rendered and
 // always tied to their control — no placeholder-as-label anywhere in the admin.
@@ -58,7 +74,7 @@ export function Field({
   label,
   name,
   hint,
-  error,
+  error: explicitError,
   children,
   required,
 }: {
@@ -69,6 +85,12 @@ export function Field({
   children?: ReactNode
   required?: boolean
 }) {
+  // Called unconditionally — `??` short-circuits, and a hook behind a
+  // short-circuit changes hook order between renders.
+  const formState = useFormState()
+  // Falls back to the surrounding form's result, so a server-side validation
+  // error lands on the field it belongs to with no per-page plumbing.
+  const error = explicitError ?? formState.fieldErrors?.[name]
   const hintId = `${name}-hint`
   return (
     <div>
@@ -255,8 +277,11 @@ export function CheckboxList({
 }
 
 /**
- * The standard admin form: binds an action, renders its message, and exposes
- * field errors to children through a render prop.
+ * The standard admin form: binds an action, renders its message, and publishes
+ * the result on context so `Field` can mark the input that failed.
+ *
+ * `children` is plain JSX — never a function. Pages are Server Components and
+ * this is a Client Component; a function prop cannot cross that boundary.
  */
 export function AdminForm({
   action,
@@ -265,18 +290,20 @@ export function AdminForm({
   footer,
 }: {
   action: (prev: ActionState, formData: FormData) => Promise<ActionState>
-  children: ReactNode | ((state: ActionState) => ReactNode)
+  children: ReactNode
   className?: string
   footer?: ReactNode
 }) {
   const [state, formAction] = useActionState<ActionState, FormData>(action, {})
   return (
-    <form action={formAction} className={className}>
-      {typeof children === 'function' ? children(state) : children}
-      <div className="flex flex-wrap items-center gap-3">
-        {footer ?? <SubmitButton />}
-        <FormMessage state={state} />
-      </div>
-    </form>
+    <FormStateContext value={state}>
+      <form action={formAction} className={className}>
+        {children}
+        <div className="flex flex-wrap items-center gap-3">
+          {footer ?? <SubmitButton />}
+          <FormMessage state={state} />
+        </div>
+      </form>
+    </FormStateContext>
   )
 }

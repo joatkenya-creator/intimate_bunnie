@@ -432,7 +432,37 @@ async function seedSettingsAndNotifications() {
   }
 }
 
-async function main() {
+/**
+ * Structure only: the built-in roles and the settings defaults, with no invented
+ * people, orders, or content. This is the mode to run against a real store —
+ * `--demo` is for a development database you do not mind filling with fiction.
+ */
+async function seedStructureOnly() {
+  await seedRoles()
+
+  for (const [key, value] of Object.entries(SETTINGS_DEFAULTS)) {
+    await db.setting.upsert({ where: { key }, create: { key, value: value as object }, update: {} })
+  }
+
+  // Staff who can open the admin but hold no role grant nothing at all, which
+  // looks exactly like a broken deploy. Give them Administrator to land on.
+  const administrator = await db.adminRole.findUnique({ where: { slug: 'administrator' }, select: { id: true } })
+  const orphaned = await db.user.updateMany({
+    where: { role: { in: ['STAFF', 'ADMIN'] }, adminRoleId: null },
+    data: { adminRoleId: administrator?.id },
+  })
+
+  const supers = await db.user.count({ where: { role: 'SUPER_ADMIN' } })
+
+  console.log(`\nRoles and settings ready. ${orphaned.count} staff account(s) given the Administrator role.`)
+  if (supers === 0) {
+    console.log('\n  No Super Administrator exists. Nobody can manage staff, roles, or settings until')
+    console.log('  one does. Promote yourself with:')
+    console.log(`    UPDATE "User" SET role = 'SUPER_ADMIN' WHERE email = 'you@example.com';`)
+  }
+}
+
+async function seedDemoData() {
   await seedRoles()
   await seedStaff()
   await seedCustomers()
@@ -446,6 +476,17 @@ async function main() {
   console.log('\nAdmin seed complete.')
   console.log(`  Sign in at /admin as ${ADMIN_EMAIL} / ${ADMIN_PASSWORD}`)
   console.log('  Change that password before this database is reachable from the internet.')
+}
+
+async function main() {
+  const demo = process.argv.includes('--demo')
+  if (demo) {
+    console.log('Seeding DEMO data — fictional staff, customers, and orders.\n')
+    await seedDemoData()
+  } else {
+    console.log('Seeding structure only. Pass --demo for the fictional store.\n')
+    await seedStructureOnly()
+  }
 }
 
 main()

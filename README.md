@@ -19,15 +19,18 @@ cp .env.example .env        # fill in DATABASE_URL and AUTH_SECRET
 npx prisma generate
 npm run db:push             # create tables
 npm run db:seed             # 38 products across 6 top-level categories
-npm run db:seed:admin       # roles, staff, orders, customers, content, settings
+npm run db:seed:demo        # roles, settings + a fictional staff/order/customer set
 npm run dev
 ```
 
 Generate an `AUTH_SECRET` with `openssl rand -base64 32`.
 
-The admin seed prints the credentials it created (`owner@intimatebunnie.test`
+`db:seed:demo` prints the credentials it created (`owner@intimatebunnie.test`
 unless you set `ADMIN_EMAIL` / `ADMIN_PASSWORD`). Sign in at `/account/login`,
-then open `/admin`. To promote an existing account instead:
+then open `/admin`.
+
+**Against a real store, run `npm run db:seed:admin` instead** — roles and
+settings defaults only, no invented people or orders. Then promote yourself:
 
 ```sql
 UPDATE "User" SET role = 'SUPER_ADMIN' WHERE email = 'you@example.com';
@@ -48,7 +51,8 @@ promotions, content, blog, SEO, reports, settings, and staff roles — see
 | `npm test` | Unit tests (`node --test`, no framework) |
 | `npm run db:push` | Push the Prisma schema to the database |
 | `npm run db:seed` | Reset and seed the catalog (destructive) |
-| `npm run db:seed:admin` | Seed admin data — additive, safe to re-run |
+| `npm run db:seed:admin` | Built-in roles + settings defaults. Safe against a real store. |
+| `npm run db:seed:demo` | The above **plus** fictional staff, customers, and orders. Development only. |
 | `npm run cf:build` | Build the Cloudflare Worker |
 | `npm run cf:size` | Build, then print the gzip Worker size |
 | `npm run cf:deploy` | Build and deploy to Cloudflare |

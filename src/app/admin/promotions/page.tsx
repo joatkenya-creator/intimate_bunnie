@@ -149,47 +149,43 @@ export default async function AdminPromotions({ searchParams }: { searchParams: 
         <Panel title={editing ? `Edit ${editing.code}` : 'New promotion'}>
           {mayWrite ? (
             <AdminForm action={savePromotion} key={editing?.id ?? 'new'}>
-              {(state) => (
-                <>
-                  {editing && <input type="hidden" name="id" value={editing.id} />}
-                  <TextField label="Name" name="name" defaultValue={editing?.name} required error={state.fieldErrors?.name} />
-                  <SelectField label="Kind" name="kind" defaultValue={editing?.kind ?? 'CODE'} options={KINDS} />
-                  <TextField label="Code" name="code" defaultValue={editing?.code} hint="Leave blank for automatic discounts and gift cards — one is generated." />
-                  <TextArea label="Description" name="description" rows={2} defaultValue={editing?.description} hint="Internal only." />
+              {editing && <input type="hidden" name="id" value={editing.id} />}
+              <TextField label="Name" name="name" defaultValue={editing?.name} required />
+              <SelectField label="Kind" name="kind" defaultValue={editing?.kind ?? 'CODE'} options={KINDS} />
+              <TextField label="Code" name="code" defaultValue={editing?.code} hint="Leave blank for automatic discounts and gift cards — one is generated." />
+              <TextArea label="Description" name="description" rows={2} defaultValue={editing?.description} hint="Internal only." />
 
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <TextField label="Percent off" name="percentOff" type="number" min="1" max="90" defaultValue={editing?.percentOff ?? ''} />
-                    <TextField label="Amount off (USD)" name="amountOff" type="number" step="0.01" min="0" defaultValue={editing?.amountOffCents ? (editing.amountOffCents / 100).toFixed(2) : ''} />
-                  </div>
-                  <p className="text-xs text-[var(--admin-muted)]">Set one of the two, not both.</p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <TextField label="Percent off" name="percentOff" type="number" min="1" max="90" defaultValue={editing?.percentOff ?? ''} />
+                <TextField label="Amount off (USD)" name="amountOff" type="number" step="0.01" min="0" defaultValue={editing?.amountOffCents ? (editing.amountOffCents / 100).toFixed(2) : ''} />
+              </div>
+              <p className="text-xs text-[var(--admin-muted)]">Set one of the two, not both.</p>
 
-                  <TextField label="Gift card balance (USD)" name="balance" type="number" step="0.01" min="0" defaultValue={editing?.balanceCents ? (editing.balanceCents / 100).toFixed(2) : ''} hint="Gift cards only." />
+              <TextField label="Gift card balance (USD)" name="balance" type="number" step="0.01" min="0" defaultValue={editing?.balanceCents ? (editing.balanceCents / 100).toFixed(2) : ''} hint="Gift cards only." />
 
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <TextField label="Starts at" name="startsAt" type="datetime-local" defaultValue={editing?.startsAt?.toISOString().slice(0, 16) ?? ''} />
-                    <TextField label="Expires at" name="expiresAt" type="datetime-local" defaultValue={editing?.expiresAt?.toISOString().slice(0, 16) ?? ''} />
-                  </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <TextField label="Starts at" name="startsAt" type="datetime-local" defaultValue={editing?.startsAt?.toISOString().slice(0, 16) ?? ''} />
+                <TextField label="Expires at" name="expiresAt" type="datetime-local" defaultValue={editing?.expiresAt?.toISOString().slice(0, 16) ?? ''} />
+              </div>
 
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <TextField label="Minimum spend (USD)" name="minSpend" type="number" step="0.01" min="0" defaultValue={editing?.minSpendCents ? (editing.minSpendCents / 100).toFixed(2) : ''} />
-                    <TextField label="Total usage limit" name="usageLimit" type="number" min="1" defaultValue={editing?.usageLimit ?? ''} />
-                  </div>
-                  <TextField label="Per-customer limit" name="perCustomerLimit" type="number" min="1" defaultValue={editing?.perCustomerLimit ?? ''} />
+              <div className="grid gap-3 sm:grid-cols-2">
+                <TextField label="Minimum spend (USD)" name="minSpend" type="number" step="0.01" min="0" defaultValue={editing?.minSpendCents ? (editing.minSpendCents / 100).toFixed(2) : ''} />
+                <TextField label="Total usage limit" name="usageLimit" type="number" min="1" defaultValue={editing?.usageLimit ?? ''} />
+              </div>
+              <TextField label="Per-customer limit" name="perCustomerLimit" type="number" min="1" defaultValue={editing?.perCustomerLimit ?? ''} />
 
-                  <CheckboxList
-                    legend="Restrict to categories (leave empty for the whole cart)"
-                    name="categoryIds"
-                    options={categories.map((category) => ({ value: category.id, label: category.name }))}
-                    selected={((editing?.appliesTo as { categoryIds?: string[] } | null)?.categoryIds ?? []) as string[]}
-                  />
+              <CheckboxList
+                legend="Restrict to categories (leave empty for the whole cart)"
+                name="categoryIds"
+                options={categories.map((category) => ({ value: category.id, label: category.name }))}
+                selected={((editing?.appliesTo as { categoryIds?: string[] } | null)?.categoryIds ?? []) as string[]}
+              />
 
-                  <Toggle label="Active" name="active" defaultChecked={editing ? editing.active : true} />
-                  {editing && (
-                    <Link href="/admin/promotions" className="block text-xs text-[var(--admin-accent)]">
-                      Cancel and start a new one
-                    </Link>
-                  )}
-                </>
+              <Toggle label="Active" name="active" defaultChecked={editing ? editing.active : true} />
+              {editing && (
+                <Link href="/admin/promotions" className="block text-xs text-[var(--admin-accent)]">
+                  Cancel and start a new one
+                </Link>
               )}
             </AdminForm>
           ) : (

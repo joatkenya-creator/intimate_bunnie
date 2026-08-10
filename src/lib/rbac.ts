@@ -9,8 +9,10 @@ import { can, type Permission } from './permissions'
 export * from './permissions'
 
 // Admin sessions expire on idle far sooner than the 30-day storefront cookie.
-// A shared laptop in a stockroom is the threat, not a stolen cookie.
-export const ADMIN_IDLE_TIMEOUT_SECONDS = Number(process.env.ADMIN_SESSION_TIMEOUT_MINUTES ?? 60) * 60
+// A shared laptop in a stockroom is the threat, not a stolen cookie. Middleware
+// slides the window forward while the admin is in use; this is the enforcement.
+export { ADMIN_IDLE_TIMEOUT_SECONDS } from './session'
+import { ADMIN_IDLE_TIMEOUT_SECONDS } from './session'
 
 export type AdminActor = {
   id: string
@@ -109,7 +111,10 @@ export async function requirePagePermission(permission: Permission): Promise<Adm
     return await requirePermission(permission)
   } catch (error) {
     if (error instanceof AdminAuthError && error.kind === 'FORBIDDEN') {
-      redirect(`/admin?denied=${encodeURIComponent(permission)}`)
+      // Never bounce to /admin: the dashboard is itself permission-gated, so a
+      // staff member without `dashboard.read` would redirect into a loop.
+      // /admin/no-access is the one admin route with no permission check.
+      redirect(`/admin/no-access?permission=${encodeURIComponent(permission)}`)
     }
     redirect('/account/login?next=/admin&timeout=1')
   }
