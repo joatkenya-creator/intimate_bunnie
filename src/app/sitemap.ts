@@ -1,19 +1,20 @@
 import type { MetadataRoute } from 'next'
-import { db } from '@/lib/db'
+import { query } from '@/lib/sql'
 import { absoluteUrl } from '@/config/site'
 
 export const dynamic = 'force-dynamic'
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const [categories, products, pages] = await Promise.all([
-    db.category.findMany({ where: { visible: true }, select: { slug: true } }),
-    db.product.findMany({ where: { active: true }, select: { slug: true, updatedAt: true }, take: 5000 }),
+    query<{ slug: string }>('SELECT "slug" FROM "Category" WHERE "visible" = true'),
+    query<{ slug: string; updatedAt: Date }>(
+      'SELECT "slug", "updatedAt" FROM "Product" WHERE "active" = true LIMIT 5000',
+    ),
     // CMS pages that are not one of the static documents below.
-    db.contentEntry.findMany({
-      where: { type: { in: ['PAGE', 'POLICY'] }, status: 'PUBLISHED', robots: null },
-      select: { slug: true, updatedAt: true },
-      take: 500,
-    }),
+    query<{ slug: string; updatedAt: Date }>(
+      `SELECT "slug", "updatedAt" FROM "ContentEntry"
+       WHERE "type" IN ('PAGE', 'POLICY') AND "status" = 'PUBLISHED' AND "robots" IS NULL LIMIT 500`,
+    ),
   ])
 
   const staticSlugs = ['about', 'shipping', 'returns', 'care', 'faq', 'privacy', 'terms']

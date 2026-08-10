@@ -192,7 +192,8 @@ export default async function ProductPage({ params }: { params: Promise<Params> 
                 <h3 className="mt-3 text-base">{review.title}</h3>
                 <p className="mt-2 text-sm leading-relaxed text-plum-700">{review.body}</p>
                 <p className="mt-3 text-xs text-plum-500">
-                  {review.authorName} · {review.createdAt.toLocaleDateString('en-US')}
+                  {/* Timestamps arrive as ISO strings from json_agg, not Dates. */}
+                  {review.authorName} · {new Date(review.createdAt).toLocaleDateString('en-US')}
                 </p>
               </li>
             ))}

@@ -1,4 +1,4 @@
-import { db } from '@/lib/db'
+import { query } from '@/lib/sql'
 import { runDueTransitions } from '@/server/scheduler'
 
 export const dynamic = 'force-dynamic'
@@ -14,11 +14,9 @@ export const dynamic = 'force-dynamic'
 export async function GET() {
   try {
     const [rows] = await Promise.all([
-      db.redirect.findMany({
-        where: { active: true },
-        select: { source: true, destination: true, statusCode: true },
-        take: 2000,
-      }),
+      query<{ source: string; destination: string; statusCode: number }>(
+        `SELECT "source", "destination", "statusCode" FROM "Redirect" WHERE "active" = true LIMIT 2000`,
+      ),
       runDueTransitions().catch(() => null),
     ])
 

@@ -1,30 +1,30 @@
 import 'server-only'
-import { db } from '@/lib/db'
-import { notify } from './admin'
+import { query } from '@/lib/sql'
 
 // Scheduled publishing without a scheduler. Two UPDATEs flip anything whose
-// publish time has passed; `/api/redirects` calls this on the once-a-minute
-// poll middleware already makes, so scheduling works on the free plan with no
-// cron binding. Point a Cloudflare cron trigger at /api/admin/cron when the
-// piggyback is not precise enough.
+// publish time has passed; `/api/redirects` calls this on the once-a-minute poll
+// middleware already makes, so scheduling works on the free plan with no cron
+// binding. Point a Cloudflare cron trigger at /api/admin/cron when the piggyback
+// is not precise enough.
+//
+// Plain SQL, not Prisma: this runs on a public request path, and the WASM engine
+// cannot be instantiated inside the free plan's CPU budget.
 
 export type SweepResult = { products: number; content: number; lowStockAlerts: number }
 
 export async function runDueTransitions(): Promise<SweepResult> {
-  const now = new Date()
-
   const [products, content] = await Promise.all([
-    db.product.updateMany({
-      where: { status: 'SCHEDULED', publishAt: { lte: now } },
-      data: { status: 'PUBLISHED', active: true },
-    }),
-    db.contentEntry.updateMany({
-      where: { status: 'SCHEDULED', publishAt: { lte: now } },
-      data: { status: 'PUBLISHED' },
-    }),
+    query<{ id: string }>(
+      `UPDATE "Product" SET "status" = 'PUBLISHED', "active" = true
+       WHERE "status" = 'SCHEDULED' AND "publishAt" <= now() RETURNING "id"`,
+    ),
+    query<{ id: string }>(
+      `UPDATE "ContentEntry" SET "status" = 'PUBLISHED'
+       WHERE "status" = 'SCHEDULED' AND "publishAt" <= now() RETURNING "id"`,
+    ),
   ])
 
-  return { products: products.count, content: content.count, lowStockAlerts: 0 }
+  return { products: products.length, content: content.length, lowStockAlerts: 0 }
 }
 
 /**
@@ -33,27 +33,25 @@ export async function runDueTransitions(): Promise<SweepResult> {
  * two units does not file an alert every minute.
  */
 export async function sweepLowStock(): Promise<number> {
-  const since = new Date(Date.now() - 24 * 60 * 60 * 1000)
+  const raised = await query<{ id: string }>(
+    `INSERT INTO "AdminNotification" ("id", "type", "level", "title", "body", "link", "createdAt")
+     SELECT gen_random_uuid()::text, 'LOW_STOCK',
+       CASE WHEN p."inventory" = 0 THEN 'CRITICAL'::"NotificationLevel" ELSE 'WARNING'::"NotificationLevel" END,
+       CASE WHEN p."inventory" = 0 THEN 'Out of stock: ' || p."name" ELSE 'Low stock: ' || p."name" END,
+       p."inventory" || ' left on hand.',
+       '/admin/inventory?product=' || p."id",
+       now()
+     FROM "Product" p
+     WHERE p."active" = true AND p."inventory" <= p."lowStockAt"
+       AND NOT EXISTS (
+         SELECT 1 FROM "AdminNotification" n
+         WHERE n."type" = 'LOW_STOCK'
+           AND n."link" = '/admin/inventory?product=' || p."id"
+           AND n."createdAt" >= now() - interval '24 hours'
+       )
+     LIMIT 50
+     RETURNING "id"`,
+  )
 
-  const low = await db.$queryRaw<{ id: string; name: string; inventory: number }[]>`
-    SELECT p."id", p."name", p."inventory"
-    FROM "Product" p
-    WHERE p."active" = true AND p."inventory" <= p."lowStockAt"
-      AND NOT EXISTS (
-        SELECT 1 FROM "AdminNotification" n
-        WHERE n."type" = 'LOW_STOCK' AND n."link" = '/admin/inventory?product=' || p."id" AND n."createdAt" >= ${since}
-      )
-    LIMIT 50`
-
-  for (const product of low) {
-    await notify({
-      type: 'LOW_STOCK',
-      level: product.inventory === 0 ? 'CRITICAL' : 'WARNING',
-      title: product.inventory === 0 ? `Out of stock: ${product.name}` : `Low stock: ${product.name}`,
-      body: `${product.inventory} left on hand.`,
-      link: `/admin/inventory?product=${product.id}`,
-    })
-  }
-
-  return low.length
+  return raised.length
 }

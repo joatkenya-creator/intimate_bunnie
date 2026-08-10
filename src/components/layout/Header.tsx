@@ -1,6 +1,6 @@
-import { db } from '@/lib/db'
+import { query } from '@/lib/sql'
 import { currentUser } from '@/lib/auth'
-import { getSettings } from '@/server/admin'
+import { getSettings } from '@/server/settings'
 import { NavBar, type NavCategory } from './NavBar'
 
 async function getNav(): Promise<NavCategory[]> {
@@ -8,17 +8,19 @@ async function getNav(): Promise<NavCategory[]> {
   // prerenders at build time when no database is reachable. A missing nav
   // degrades the chrome; it should never take a page down.
   try {
-    return await db.category.findMany({
-      // Hidden categories keep their URL but leave the nav — that is what the
-      // visibility toggle in the admin means.
-      where: { parentId: null, visible: true },
-      orderBy: { position: 'asc' },
-      select: {
-        slug: true,
-        name: true,
-        children: { where: { visible: true }, orderBy: { position: 'asc' }, select: { slug: true, name: true } },
-      },
-    })
+    // Hidden categories keep their URL but leave the nav — that is what the
+    // visibility toggle in the admin means. Children arrive as JSON so the
+    // whole nav is one round trip.
+    return await query<NavCategory>(
+      `SELECT c."slug", c."name",
+         COALESCE((
+           SELECT json_agg(json_build_object('slug', ch."slug", 'name', ch."name") ORDER BY ch."position")
+           FROM "Category" ch WHERE ch."parentId" = c."id" AND ch."visible" = true
+         ), '[]'::json) AS children
+       FROM "Category" c
+       WHERE c."parentId" IS NULL AND c."visible" = true
+       ORDER BY c."position" ASC`,
+    )
   } catch {
     return []
   }

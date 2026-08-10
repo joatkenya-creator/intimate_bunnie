@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { pageMetadata, jsonLd } from '@/lib/seo'
 import { site } from '@/config/site'
-import { db } from '@/lib/db'
+import { queryOne } from '@/lib/sql'
 
 type Params = { slug: string }
 
@@ -111,10 +111,22 @@ export const dynamic = 'force-dynamic'
  */
 async function managed(slug: string) {
   try {
-    return await db.contentEntry.findFirst({
-      where: { slug, type: { in: ['PAGE', 'POLICY'] }, status: 'PUBLISHED' },
-      select: { title: true, excerpt: true, body: true, seoTitle: true, seoDesc: true, canonicalUrl: true, robots: true, heroImage: true },
-    })
+    return await queryOne<{
+      title: string
+      excerpt: string | null
+      body: string
+      seoTitle: string | null
+      seoDesc: string | null
+      canonicalUrl: string | null
+      robots: string | null
+      heroImage: string | null
+    }>(
+      `SELECT "title", "excerpt", "body", "seoTitle", "seoDesc", "canonicalUrl", "robots", "heroImage"
+       FROM "ContentEntry"
+       WHERE "slug" = $1 AND "type" IN ('PAGE', 'POLICY') AND "status" = 'PUBLISHED'
+       LIMIT 1`,
+      [slug],
+    )
   } catch {
     // A page must not go down because the database blinked.
     return null

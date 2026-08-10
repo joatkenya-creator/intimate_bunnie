@@ -1,6 +1,6 @@
 import 'server-only'
 import { cookies } from 'next/headers'
-import { db } from './db'
+import { queryOne } from './sql'
 import { b64url, fromB64url, timingSafeEqual } from './password'
 import {
   hmac,
@@ -85,13 +85,17 @@ async function readSession(): Promise<SessionPayload | null> {
   return verifySessionToken((await cookies()).get(SESSION_COOKIE)?.value)
 }
 
-export async function currentUser() {
+export type CurrentUser = { id: string; email: string; name: string | null; role: string }
+
+/**
+ * Runs on every request through the header, so it must not touch Prisma: the
+ * WASM engine cannot be instantiated inside the free plan's CPU budget. Plain
+ * SQL over Neon's HTTP endpoint — see lib/sql.ts.
+ */
+export async function currentUser(): Promise<CurrentUser | null> {
   const session = await readSession()
   if (!session) return null
-  return db.user.findUnique({
-    where: { id: session.uid },
-    select: { id: true, email: true, name: true, role: true },
-  })
+  return queryOne<CurrentUser>('SELECT "id", "email", "name", "role" FROM "User" WHERE "id" = $1', [session.uid])
 }
 
 export async function requireUser() {
