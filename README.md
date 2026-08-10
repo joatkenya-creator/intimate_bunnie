@@ -3,8 +3,11 @@
 A U.S. adult ecommerce storefront built on Next.js (App Router) and PostgreSQL,
 deployed to Cloudflare Workers through OpenNext.
 
-**Worker bundle: 1256 KiB gzip** against a 2.5 MiB target and a 3.0 MiB hard
-limit. See [PERFORMANCE.md](docs/PERFORMANCE.md) for the budget.
+**Worker bundle: 2993 KiB gzip** against a 2.5 MiB target and a 3.0 MiB hard
+limit — over target and close to the ceiling since the admin shipped. Run
+`npm run cf:size` before adding anything server-side. See
+[PERFORMANCE.md](docs/PERFORMANCE.md) for the budget and the duplicated Prisma
+WASM engine that is the likeliest cause.
 
 ## Requirements
 

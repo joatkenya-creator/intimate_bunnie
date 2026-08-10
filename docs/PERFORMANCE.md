@@ -9,11 +9,28 @@
 | Fail | > 2.5 MiB |
 | Hard failure | ≥ 3.0 MiB |
 
-**Measured: 1256.46 KiB gzip** (6213.81 KiB raw) — Green, roughly half the
-target with headroom for the deferred integrations.
+**Measured: 2993.23 KiB gzip** (12368.12 KiB raw) after the admin shipped —
+**Fail band, and 7 KiB under the 3.0 MiB hard ceiling.** It deploys today. The
+next non-trivial addition may not.
+
+Previously 1256.46 KiB gzip (6213.81 KiB raw), before the admin.
 
 Measure with `npm run cf:size` and read the `gzip` figure from `Total Upload`.
 That is the number Cloudflare enforces.
+
+### The first thing to look at
+
+The Prisma WASM query engine is in the bundle **twice**, 2243.8 KiB each:
+
+```
+.open-next/server-functions/default/.next/server/chunks/ssr/…query_engine_bg…wasm
+.open-next/server-functions/default/.next/server/chunks/…query_engine_bg…wasm
+```
+
+WASM barely compresses, so that duplication is a large share of the total. One
+copy served from a shared chunk is the single biggest available win — worth
+confirming before shaving anything else, because everything else is Next's own
+runtime.
 
 ### What is in it
 
