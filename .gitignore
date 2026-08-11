@@ -28,3 +28,4 @@ Thumbs.db
 
 # generated prisma clients (npx prisma generate)
 src/generated/
+.vercel

@@ -44,12 +44,16 @@ export function storageKey(folder: string, filename: string): string {
 }
 
 /**
- * Vercel Blob. The token is injected by the Blob store integration, so its
+ * Vercel Blob. Credentials are injected by the store integration, so their
  * absence is how an unconfigured deployment is detected — and it fails with a
  * sentence an operator can act on instead of a type error.
+ *
+ * Two credential shapes exist and the SDK accepts either: OIDC (`BLOB_STORE_ID`
+ * plus a runtime-injected `VERCEL_OIDC_TOKEN`) or a static read-write token.
+ * Gate on both, or a store connected the OIDC way reads as unconfigured.
  */
 export async function getMediaStorage(): Promise<MediaStorageProvider> {
-  if (process.env.BLOB_READ_WRITE_TOKEN) {
+  if (process.env.BLOB_STORE_ID || process.env.BLOB_READ_WRITE_TOKEN) {
     const { put } = await import('@vercel/blob')
     return {
       id: 'vercel-blob',
