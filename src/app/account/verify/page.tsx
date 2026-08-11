@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { db } from '@/lib/db'
+import { query, queryOne } from '@/lib/sql'
 import { tokenSubject, verifyToken } from '@/lib/auth'
 import { pageMetadata } from '@/lib/seo'
 
@@ -18,13 +18,16 @@ async function confirm(token: string | undefined): Promise<boolean> {
 
   const claimed = tokenSubject(token)
   const user = claimed
-    ? await db.user.findUnique({ where: { id: claimed }, select: { id: true, email: true, emailVerifiedAt: true } })
+    ? await queryOne<{ id: string; email: string; emailVerifiedAt: Date | null }>(
+        'SELECT "id", "email", "emailVerifiedAt" FROM "User" WHERE "id" = $1',
+        [claimed],
+      )
     : null
   // Bound to the address: a link mailed to the old address cannot confirm a new one.
   if (!user || !(await verifyToken('verify-email', token, user.email))) return false
 
   if (!user.emailVerifiedAt) {
-    await db.user.update({ where: { id: user.id }, data: { emailVerifiedAt: new Date() } })
+    await query('UPDATE "User" SET "emailVerifiedAt" = now() WHERE "id" = $1', [user.id])
   }
   return true
 }

@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { currentUser } from '@/lib/auth'
 import { logout } from '@/actions/auth'
-import { db } from '@/lib/db'
+import { query } from '@/lib/sql'
 import { formatUSD } from '@/lib/money'
 import { pageMetadata } from '@/lib/seo'
 import { isStaffRole } from '@/lib/permissions'
@@ -21,12 +21,11 @@ export default async function AccountPage() {
   const user = await currentUser().catch(() => null)
   if (!user) redirect('/account/login')
 
-  const orders = await db.order.findMany({
-    where: { userId: user.id },
-    orderBy: { createdAt: 'desc' },
-    take: 3,
-    select: { number: true, status: true, totalCents: true, createdAt: true },
-  })
+  const orders = await query<{ number: string; status: string; totalCents: number; createdAt: Date }>(
+    `SELECT "number", "status", "totalCents", "createdAt" FROM "Order"
+     WHERE "userId" = $1 ORDER BY "createdAt" DESC LIMIT 3`,
+    [user.id],
+  )
 
   return (
     <div className="container-ib max-w-3xl py-14">

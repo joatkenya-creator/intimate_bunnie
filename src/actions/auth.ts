@@ -2,7 +2,7 @@
 
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
-import { db } from '@/lib/db'
+import { query, queryOne } from '@/lib/sql'
 import {
   createSession,
   destroySession,
@@ -14,6 +14,7 @@ import {
 } from '@/lib/auth'
 import { absoluteUrl } from '@/config/site'
 import { rateLimit } from '@/lib/security'
+import { newId } from '@/lib/ids'
 import { sendPasswordChanged, sendPasswordReset, sendVerifyEmail, sendWelcome } from '@/services/email'
 
 export type AuthState = { error?: string; sent?: boolean }
@@ -37,14 +38,14 @@ export async function register(_prev: AuthState, formData: FormData): Promise<Au
   if (!parsed.success) return { error: parsed.error.issues[0].message }
 
   const email = parsed.data.email.toLowerCase()
-  if (await db.user.findUnique({ where: { email }, select: { id: true } })) {
+  if (await queryOne<{ id: string }>('SELECT "id" FROM "User" WHERE "email" = $1', [email])) {
     return { error: 'An account with that email already exists' }
   }
 
-  const user = await db.user.create({
-    data: { email, name: parsed.data.name, passwordHash: await hashPassword(parsed.data.password) },
-    select: { id: true },
-  })
+  const user = (await queryOne<{ id: string }>(
+    'INSERT INTO "User" ("id", "email", "name", "passwordHash") VALUES ($1,$2,$3,$4) RETURNING "id"',
+    [newId(), email, parsed.data.name ?? null, await hashPassword(parsed.data.password)],
+  ))!
 
   // Bound to the address itself, so a link mailed to an old address cannot
   // verify a new one. Neither send can throw; both run before the redirect.
@@ -62,10 +63,10 @@ export async function requestPasswordReset(_prev: AuthState, formData: FormData)
   // way to test which addresses are registered.
   if (!parsed.success) return { sent: true }
 
-  const user = await db.user.findUnique({
-    where: { email: parsed.data.toLowerCase() },
-    select: { id: true, email: true, passwordHash: true },
-  })
+  const user = await queryOne<{ id: string; email: string; passwordHash: string }>(
+    'SELECT "id", "email", "passwordHash" FROM "User" WHERE "email" = $1',
+    [parsed.data.toLowerCase()],
+  )
 
   if (user) {
     // Signed against the current hash: the link dies as soon as it is used.
@@ -87,16 +88,19 @@ export async function resetPassword(_prev: AuthState, formData: FormData): Promi
 
   const claimed = tokenSubject(parsed.data.token)
   const user = claimed
-    ? await db.user.findUnique({ where: { id: claimed }, select: { id: true, email: true, passwordHash: true } })
+    ? await queryOne<{ id: string; email: string; passwordHash: string }>(
+        'SELECT "id", "email", "passwordHash" FROM "User" WHERE "id" = $1',
+        [claimed],
+      )
     : null
   if (!user || !(await verifyToken('password-reset', parsed.data.token, user.passwordHash))) {
     return { error: 'That link has expired or has already been used. Request a new one.' }
   }
 
-  await db.user.update({
-    where: { id: user.id },
-    data: { passwordHash: await hashPassword(parsed.data.password) },
-  })
+  await query('UPDATE "User" SET "passwordHash" = $1 WHERE "id" = $2', [
+    await hashPassword(parsed.data.password),
+    user.id,
+  ])
   await sendPasswordChanged(user.email, new Date())
 
   await createSession(user.id)
@@ -120,24 +124,29 @@ export async function login(_prev: AuthState, formData: FormData): Promise<AuthS
     return { error: 'Too many attempts. Wait a few minutes and try again.' }
   }
 
-  const user = await db.user.findUnique({
-    where: { email },
-    select: { id: true, passwordHash: true, role: true, status: true },
-  })
+  const user = await queryOne<{ id: string; passwordHash: string; role: string; status: string }>(
+    'SELECT "id", "passwordHash", "role", "status" FROM "User" WHERE "email" = $1',
+    [email],
+  )
   // Same message either way — never reveal which accounts exist.
   if (!user || !(await verifyPassword(parsed.data.password, user.passwordHash))) {
     // Failed attempts are the login history that matters; the successful ones
     // are only interesting next to them.
-    await db.auditLog.create({ data: { actor: email, action: 'auth.login.failed' } }).catch(() => null)
+    await query('INSERT INTO "AuditLog" ("id", "actor", "action") VALUES ($1,$2,$3)', [
+      newId(),
+      email,
+      'auth.login.failed',
+    ]).catch(() => null)
     return { error: 'Incorrect email or password' }
   }
 
   if (user.status === 'BLOCKED') return { error: 'That account has been suspended. Contact support.' }
 
-  await db.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date(), status: 'ACTIVE' } })
-  await db.auditLog
-    .create({ data: { actor: email, actorId: user.id, action: 'auth.login', meta: { role: user.role } } })
-    .catch(() => null)
+  await query(`UPDATE "User" SET "lastLoginAt" = now(), "status" = 'ACTIVE' WHERE "id" = $1`, [user.id])
+  await query(
+    'INSERT INTO "AuditLog" ("id", "actor", "actorId", "action", "meta") VALUES ($1,$2,$3,$4,$5::jsonb)',
+    [newId(), email, user.id, 'auth.login', JSON.stringify({ role: user.role })],
+  ).catch(() => null)
 
   await createSession(user.id)
   redirect(safeNext(formData.get('next')) ?? '/account')

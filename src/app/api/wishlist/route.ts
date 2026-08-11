@@ -1,4 +1,5 @@
-import { db } from '@/lib/db'
+import { query, transaction } from '@/lib/sql'
+import { newId } from '@/lib/ids'
 import { currentUser } from '@/lib/auth'
 import { rateLimit, clientIp } from '@/lib/security'
 
@@ -32,14 +33,15 @@ export async function POST(request: Request) {
 
   // Only ids that are real products — a crafted payload must not create rows
   // pointing at nothing.
-  const products = await db.product.findMany({ where: { id: { in: ids } }, select: { id: true } })
+  const products = await query<{ id: string }>('SELECT "id" FROM "Product" WHERE "id" = ANY($1)', [ids])
 
-  await db.$transaction([
-    db.wishlistItem.deleteMany({ where: { userId: user.id } }),
-    db.wishlistItem.createMany({
-      data: products.map((product) => ({ userId: user.id, productId: product.id })),
-      skipDuplicates: true,
-    }),
+  await transaction([
+    { text: 'DELETE FROM "WishlistItem" WHERE "userId" = $1', values: [user.id] },
+    ...products.map((product) => ({
+      text: `INSERT INTO "WishlistItem" ("id", "userId", "productId") VALUES ($1,$2,$3)
+             ON CONFLICT ("userId", "productId") DO NOTHING`,
+      values: [newId(), user.id, product.id],
+    })),
   ])
 
   return new Response(null, { status: 204 })

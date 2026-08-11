@@ -2,12 +2,12 @@
 
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
-import { db } from '@/lib/db'
+import { queryOne, transaction } from '@/lib/sql'
 import { requireAdmin, requireUser } from '@/lib/auth'
-import { reference } from '@/lib/ids'
+import { reference, newId } from '@/lib/ids'
 import { isReturnable, RETURN_INSTRUCTIONS } from '@/lib/returns'
 import { sendReturnApproved, sendReturnReceived } from '@/services/email'
-import { notify } from '@/server/admin'
+import { notify } from '@/server/notifications'
 
 export type ReturnState = { error?: string; saved?: boolean; rma?: string }
 
@@ -32,18 +32,24 @@ export async function requestReturn(_prev: ReturnState, formData: FormData): Pro
   })
   if (!parsed.success) return { error: parsed.error.issues[0].message }
 
-  const order = await db.order.findUnique({
-    where: { number: parsed.data.number },
-    select: {
-      id: true,
-      number: true,
-      email: true,
-      userId: true,
-      status: true,
-      createdAt: true,
-      items: { select: { id: true, name: true, variantName: true, quantity: true } },
-    },
-  })
+  const order = await queryOne<{
+    id: string
+    number: string
+    email: string
+    userId: string | null
+    status: string
+    createdAt: Date
+    items: { id: string; name: string; variantName: string | null; quantity: number }[]
+  }>(
+    `SELECT o."id", o."number", o."email", o."userId", o."status", o."createdAt",
+       COALESCE((
+         SELECT json_agg(json_build_object('id', i."id", 'name', i."name",
+                                           'variantName', i."variantName", 'quantity', i."quantity"))
+         FROM "OrderItem" i WHERE i."orderId" = o."id"
+       ), '[]'::json) AS items
+     FROM "Order" o WHERE o."number" = $1`,
+    [parsed.data.number],
+  )
 
   // Same answer for someone else's order as for one that does not exist —
   // an order number must not be a way to probe the database.
@@ -54,23 +60,28 @@ export async function requestReturn(_prev: ReturnState, formData: FormData): Pro
   if (chosen.length !== parsed.data.orderItemIds.length) return { error: 'We could not find those items on that order' }
 
   // An item already under review or already approved cannot be sent back twice.
-  const pending = await db.returnItem.findFirst({
-    where: { orderItemId: { in: chosen.map((item) => item.id) }, return: { status: { in: ['REQUESTED', 'APPROVED'] } } },
-    select: { id: true },
-  })
+  const pending = await queryOne<{ id: string }>(
+    `SELECT ri."id" FROM "ReturnItem" ri
+     JOIN "Return" r ON r."id" = ri."returnId"
+     WHERE ri."orderItemId" = ANY($1) AND r."status" IN ('REQUESTED', 'APPROVED') LIMIT 1`,
+    [chosen.map((item) => item.id)],
+  )
   if (pending) return { error: 'One of those items is already part of an open return' }
 
   const rma = reference('RMA')
-  await db.return.create({
-    data: {
-      number: rma,
-      orderId: order.id,
-      reason: parsed.data.reason,
-      // ponytail: whole lines only, no partial quantities. Add a quantity input
-      // here and to the form if customers actually ask to split a line.
-      items: { create: chosen.map((item) => ({ orderItemId: item.id, quantity: item.quantity })) },
+  const returnId = newId()
+  await transaction([
+    {
+      text: 'INSERT INTO "Return" ("id", "number", "orderId", "reason") VALUES ($1,$2,$3,$4)',
+      values: [returnId, rma, order.id, parsed.data.reason],
     },
-  })
+    // ponytail: whole lines only, no partial quantities. Add a quantity input
+    // here and to the form if customers actually ask to split a line.
+    ...chosen.map((item) => ({
+      text: 'INSERT INTO "ReturnItem" ("id", "returnId", "orderItemId", "quantity") VALUES ($1,$2,$3,$4)',
+      values: [newId(), returnId, item.id, item.quantity],
+    })),
+  ])
 
   await sendReturnReceived(
     order.email,
@@ -110,16 +121,25 @@ export async function resolveReturn(_prev: ReturnState, formData: FormData): Pro
   })
   if (!parsed.success) return { error: 'Invalid decision' }
 
-  const request = await db.return.findUnique({
-    where: { number: parsed.data.number },
-    select: {
-      id: true,
-      number: true,
-      status: true,
-      order: { select: { id: true, number: true, email: true } },
-      items: { select: { quantity: true, orderItem: { select: { unitCents: true } } } },
-    },
-  })
+  const request = await queryOne<{
+    id: string
+    number: string
+    status: string
+    order: { id: string; number: string; email: string }
+    items: { quantity: number; orderItem: { unitCents: number } }[]
+  }>(
+    `SELECT r."id", r."number", r."status",
+       json_build_object('id', o."id", 'number', o."number", 'email', o."email") AS "order",
+       COALESCE((
+         SELECT json_agg(json_build_object('quantity', ri."quantity",
+                                           'orderItem', json_build_object('unitCents', oi."unitCents")))
+         FROM "ReturnItem" ri JOIN "OrderItem" oi ON oi."id" = ri."orderItemId"
+         WHERE ri."returnId" = r."id"
+       ), '[]'::json) AS items
+     FROM "Return" r JOIN "Order" o ON o."id" = r."orderId"
+     WHERE r."number" = $1`,
+    [parsed.data.number],
+  )
   if (!request) return { error: 'No such return' }
   // Resolving twice would mail a second approval for a refund already promised.
   if (request.status !== 'REQUESTED') return { error: `That return is already ${request.status.toLowerCase()}` }
@@ -130,34 +150,35 @@ export async function resolveReturn(_prev: ReturnState, formData: FormData): Pro
     ? request.items.reduce((sum, item) => sum + item.orderItem.unitCents * item.quantity, 0)
     : 0
 
-  await db.$transaction([
-    db.return.update({
-      where: { id: request.id },
-      data: {
-        status: parsed.data.decision,
-        refundCents,
-        resolutionNote: parsed.data.note ?? null,
-        resolvedAt: new Date(),
-      },
-    }),
-    db.auditLog.create({
-      data: { actor: admin.email, action: `return.${parsed.data.decision.toLowerCase()}`, target: request.number },
-    }),
+  await transaction([
+    {
+      text: `UPDATE "Return" SET "status" = $1::"ReturnStatus", "refundCents" = $2,
+               "resolutionNote" = $3, "resolvedAt" = now() WHERE "id" = $4`,
+      values: [parsed.data.decision, refundCents, parsed.data.note ?? null, request.id],
+    },
+    {
+      text: 'INSERT INTO "AuditLog" ("id", "actor", "action", "target") VALUES ($1,$2,$3,$4)',
+      values: [newId(), admin.email, `return.${parsed.data.decision.toLowerCase()}`, request.number],
+    },
     // The order timeline is the one place staff look for "what happened here",
     // so a return decision has to land on it too.
-    db.orderEvent.create({
-      data: {
-        orderId: request.order.id,
-        actor: admin.email,
-        type: 'RETURN',
-        message: approved
+    {
+      text: `INSERT INTO "OrderEvent" ("id", "orderId", "actor", "type", "message", "visibleToCustomer")
+             VALUES ($1,$2,$3,'RETURN',$4,true)`,
+      values: [
+        newId(),
+        request.order.id,
+        admin.email,
+        approved
           ? `Return ${request.number} approved for a $${(refundCents / 100).toFixed(2)} refund.`
           : `Return ${request.number} denied.${parsed.data.note ? ` ${parsed.data.note}` : ''}`,
-        visibleToCustomer: true,
-      },
-    }),
+      ],
+    },
     ...(approved
-      ? [db.order.update({ where: { id: request.order.id }, data: { refundedCents: { increment: refundCents } } })]
+      ? [{
+          text: 'UPDATE "Order" SET "refundedCents" = "refundedCents" + $1 WHERE "id" = $2',
+          values: [refundCents, request.order.id],
+        }]
       : []),
   ])
 

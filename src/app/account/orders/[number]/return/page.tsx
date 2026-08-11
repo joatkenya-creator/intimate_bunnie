@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { currentUser } from '@/lib/auth'
-import { db } from '@/lib/db'
+import { queryOne } from '@/lib/sql'
 import { daysLeftToReturn, isReturnable } from '@/lib/returns'
 import { ReturnRequestForm } from '@/components/account/ReturnRequestForm'
 import { pageMetadata } from '@/lib/seo'
@@ -21,17 +21,27 @@ export default async function ReturnPage({ params }: { params: Promise<{ number:
   if (!user) redirect('/account/login')
 
   const { number } = await params
-  const order = await db.order.findUnique({
-    where: { number },
-    select: {
-      number: true,
-      userId: true,
-      status: true,
-      createdAt: true,
-      items: { select: { id: true, name: true, variantName: true, quantity: true, unitCents: true } },
-      returns: { select: { number: true, status: true }, where: { status: { in: ['REQUESTED', 'APPROVED'] } } },
-    },
-  })
+  const order = await queryOne<{
+    number: string
+    userId: string | null
+    status: string
+    createdAt: Date
+    items: { id: string; name: string; variantName: string | null; quantity: number; unitCents: number }[]
+    returns: { number: string; status: string }[]
+  }>(
+    `SELECT o."number", o."userId", o."status", o."createdAt",
+       COALESCE((
+         SELECT json_agg(json_build_object('id', i."id", 'name', i."name", 'variantName', i."variantName",
+                                           'quantity', i."quantity", 'unitCents', i."unitCents"))
+         FROM "OrderItem" i WHERE i."orderId" = o."id"
+       ), '[]'::json) AS items,
+       COALESCE((
+         SELECT json_agg(json_build_object('number', r."number", 'status', r."status"))
+         FROM "Return" r WHERE r."orderId" = o."id" AND r."status" IN ('REQUESTED', 'APPROVED')
+       ), '[]'::json) AS returns
+     FROM "Order" o WHERE o."number" = $1`,
+    [number],
+  )
 
   // Someone else's order is indistinguishable from one that does not exist.
   if (!order || order.userId !== user.id) notFound()

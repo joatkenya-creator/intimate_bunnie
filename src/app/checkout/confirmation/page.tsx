@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { db } from '@/lib/db'
+import { queryOne } from '@/lib/sql'
 import { formatUSD } from '@/lib/money'
 import { pageMetadata } from '@/lib/seo'
 
@@ -13,6 +13,16 @@ export const metadata: Metadata = pageMetadata({
   noindex: true,
 })
 
+type OrderSummary = {
+  number: string
+  email: string
+  totalCents: number
+  shipName: string
+  shipCity: string
+  shipState: string
+  items: { id: string; name: string; variantName: string | null; quantity: number; unitCents: number }[]
+}
+
 export default async function ConfirmationPage({
   searchParams,
 }: {
@@ -20,18 +30,16 @@ export default async function ConfirmationPage({
 }) {
   const number = (await searchParams).order
   const order = number
-    ? await db.order.findUnique({
-        where: { number },
-        select: {
-          number: true,
-          email: true,
-          totalCents: true,
-          shipName: true,
-          shipCity: true,
-          shipState: true,
-          items: { select: { id: true, name: true, variantName: true, quantity: true, unitCents: true } },
-        },
-      })
+    ? await queryOne<OrderSummary>(
+        `SELECT o."number", o."email", o."totalCents", o."shipName", o."shipCity", o."shipState",
+           COALESCE((
+             SELECT json_agg(json_build_object('id', i."id", 'name', i."name", 'variantName', i."variantName",
+                                               'quantity', i."quantity", 'unitCents', i."unitCents"))
+             FROM "OrderItem" i WHERE i."orderId" = o."id"
+           ), '[]'::json) AS items
+         FROM "Order" o WHERE o."number" = $1`,
+        [number],
+      )
     : null
 
   if (!order) {

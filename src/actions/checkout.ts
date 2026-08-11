@@ -1,14 +1,14 @@
 'use server'
 
 import { z } from 'zod'
-import { db } from '@/lib/db'
+import { query, transaction } from '@/lib/sql'
 import { currentUser } from '@/lib/auth'
 import { quoteTotals, formatUSD } from '@/lib/money'
-import { notify } from '@/server/admin'
+import { notify } from '@/server/notifications'
 import { getPaymentProvider } from '@/services/payment'
 import { sendOrderPlaced } from '@/services/email'
 import { absoluteUrl } from '@/config/site'
-import { reference } from '@/lib/ids'
+import { reference, newId } from '@/lib/ids'
 
 const lineSchema = z.object({
   productId: z.string().min(1),
@@ -38,16 +38,23 @@ export async function placeOrder(input: CheckoutInput): Promise<CheckoutResult> 
 
   // Re-price from the database. The browser's cart is a suggestion, never a
   // source of prices.
-  const products = await db.product.findMany({
-    where: { id: { in: lines.map((l) => l.productId) }, active: true },
-    select: {
-      id: true,
-      name: true,
-      priceCents: true,
-      inventory: true,
-      variants: { select: { id: true, optionValue: true, priceDelta: true, inventory: true } },
-    },
-  })
+  const products = await query<{
+    id: string
+    name: string
+    priceCents: number
+    inventory: number
+    variants: { id: string; optionValue: string; priceDelta: number; inventory: number }[]
+  }>(
+    `SELECT p."id", p."name", p."priceCents", p."inventory",
+       COALESCE((
+         SELECT json_agg(json_build_object('id', v."id", 'optionValue', v."optionValue",
+                                           'priceDelta', v."priceDelta", 'inventory', v."inventory"))
+         FROM "Variant" v WHERE v."productId" = p."id"
+       ), '[]'::json) AS variants
+     FROM "Product" p
+     WHERE p."id" = ANY($1) AND p."active" = true`,
+    [lines.map((line) => line.productId)],
+  )
 
   const items: { productId: string; name: string; variantName?: string; unitCents: number; quantity: number }[] = []
 
@@ -81,54 +88,78 @@ export async function placeOrder(input: CheckoutInput): Promise<CheckoutResult> 
   })
   if (payment.status === 'failed') return { ok: false, error: 'Payment was declined' }
 
-  // Order creation and stock decrements share a transaction so an oversell
+  // Order creation and stock decrements share one transaction so an oversell
   // cannot slip between the check above and the write.
-  await db.$transaction([
-    db.order.create({
-      data: {
+  //
+  // Neon's HTTP transactions are non-interactive: every statement goes in one
+  // batch and nothing can branch on an earlier result. That is fine here — the
+  // pricing read already happened, and the writes below are fully determined by
+  // it. The order id is generated here because Prisma's `cuid()` was a
+  // client-side default; Postgres has none.
+  const orderId = newId()
+
+  await transaction([
+    {
+      text: `INSERT INTO "Order" (
+          "id", "number", "email", "userId", "status", "subtotalCents", "shippingCents", "taxCents", "totalCents",
+          "shipName", "shipLine1", "shipLine2", "shipCity", "shipState", "shipZip",
+          "paymentProvider", "paymentReference"
+        ) VALUES ($1,$2,$3,$4,'PAID',$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+      values: [
+        orderId,
         number,
         email,
-        userId: user?.id,
-        status: 'PAID',
-        subtotalCents: totals.subtotalCents,
-        shippingCents: totals.shippingCents,
-        taxCents: totals.taxCents,
-        totalCents: totals.totalCents,
-        shipName: fullName,
-        shipLine1: line1,
-        shipLine2: line2 || null,
-        shipCity: city,
-        shipState: state.toUpperCase(),
-        shipZip: zip,
-        paymentProvider: getPaymentProvider().id,
-        paymentReference: payment.reference,
-        items: { create: items },
-      },
-    }),
+        user?.id ?? null,
+        totals.subtotalCents,
+        totals.shippingCents,
+        totals.taxCents,
+        totals.totalCents,
+        fullName,
+        line1,
+        line2 || null,
+        city,
+        state.toUpperCase(),
+        zip,
+        getPaymentProvider().id,
+        payment.reference,
+      ],
+    },
+    ...items.map((item) => ({
+      text: `INSERT INTO "OrderItem" ("id", "orderId", "productId", "name", "variantName", "unitCents", "quantity")
+             VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+      values: [newId(), orderId, item.productId, item.name, item.variantName ?? null, item.unitCents, item.quantity],
+    })),
+    // Decrement the level the shopper was actually sold from.
     ...lines.map((line) =>
       line.variantId
-        ? db.variant.update({ where: { id: line.variantId }, data: { inventory: { decrement: line.quantity } } })
-        : db.product.update({ where: { id: line.productId }, data: { inventory: { decrement: line.quantity } } }),
+        ? {
+            text: `UPDATE "Variant" SET "inventory" = "inventory" - $1 WHERE "id" = $2`,
+            values: [line.quantity, line.variantId],
+          }
+        : {
+            text: `UPDATE "Product" SET "inventory" = "inventory" - $1 WHERE "id" = $2`,
+            values: [line.quantity, line.productId],
+          },
     ),
     // On-hand comes down now; `reservedStock` counts the units sold but still
     // on the shelf, which is what a picker needs to see. Fulfilment or
     // cancellation releases it — see actions/admin/orders.ts.
-    ...lines.map((line) =>
-      db.product.update({ where: { id: line.productId }, data: { reservedStock: { increment: line.quantity } } }),
-    ),
+    ...lines.map((line) => ({
+      text: `UPDATE "Product" SET "reservedStock" = "reservedStock" + $1 WHERE "id" = $2`,
+      values: [line.quantity, line.productId],
+    })),
     // Every stock movement gets a history row, including the automatic ones.
-    ...items.map((item) =>
-      db.inventoryAdjustment.create({
-        data: {
-          productId: item.productId,
-          delta: -item.quantity,
-          resulting: (products.find((p) => p.id === item.productId)?.inventory ?? item.quantity) - item.quantity,
-          reason: 'SOLD',
-          note: `Order ${number}`,
-          actor: 'checkout',
-        },
-      }),
-    ),
+    ...items.map((item) => ({
+      text: `INSERT INTO "InventoryAdjustment" ("id", "productId", "delta", "resulting", "reason", "note", "actor")
+             VALUES ($1,$2,$3,$4,'SOLD',$5,'checkout')`,
+      values: [
+        newId(),
+        item.productId,
+        -item.quantity,
+        (products.find((p) => p.id === item.productId)?.inventory ?? item.quantity) - item.quantity,
+        `Order ${number}`,
+      ],
+    })),
   ])
 
   // After the transaction, never inside it: the order is real whether or not

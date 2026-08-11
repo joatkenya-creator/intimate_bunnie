@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { currentUser } from '@/lib/auth'
-import { db } from '@/lib/db'
+import { query } from '@/lib/sql'
 import { formatUSD } from '@/lib/money'
 import { isReturnable } from '@/lib/returns'
 import { pageMetadata } from '@/lib/seo'
@@ -20,22 +20,30 @@ export default async function OrdersPage() {
   const user = await currentUser().catch(() => null)
   if (!user) redirect('/account/login')
 
-  const orders = await db.order.findMany({
-    where: { userId: user.id },
-    orderBy: { createdAt: 'desc' },
-    take: 50,
-    select: {
-      number: true,
-      status: true,
-      totalCents: true,
-      createdAt: true,
-      items: { select: { id: true, name: true, variantName: true, quantity: true, unitCents: true } },
-      returns: {
-        select: { number: true, status: true, resolutionNote: true },
-        orderBy: { createdAt: 'desc' },
-      },
-    },
-  })
+  const orders = await query<{
+    number: string
+    status: string
+    totalCents: number
+    createdAt: Date
+    items: { id: string; name: string; variantName: string | null; quantity: number; unitCents: number }[]
+    returns: { number: string; status: string; resolutionNote: string | null }[]
+  }>(
+    `SELECT o."number", o."status", o."totalCents", o."createdAt",
+       COALESCE((
+         SELECT json_agg(json_build_object('id', i."id", 'name', i."name", 'variantName', i."variantName",
+                                           'quantity', i."quantity", 'unitCents', i."unitCents"))
+         FROM "OrderItem" i WHERE i."orderId" = o."id"
+       ), '[]'::json) AS items,
+       COALESCE((
+         SELECT json_agg(json_build_object('number', r."number", 'status', r."status",
+                                           'resolutionNote', r."resolutionNote") ORDER BY r."createdAt" DESC)
+         FROM "Return" r WHERE r."orderId" = o."id"
+       ), '[]'::json) AS returns
+     FROM "Order" o
+     WHERE o."userId" = $1
+     ORDER BY o."createdAt" DESC LIMIT 50`,
+    [user.id],
+  )
 
   return (
     <div className="container-ib max-w-3xl py-14">

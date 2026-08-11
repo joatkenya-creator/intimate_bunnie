@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
-import { db } from '@/lib/db'
+import { query, queryOne } from '@/lib/sql'
 import { requireUser, signToken } from '@/lib/auth'
 import { absoluteUrl } from '@/config/site'
 import { sendProfileUpdated, sendVerifyEmail } from '@/services/email'
@@ -38,15 +38,17 @@ export async function updateProfile(_prev: ProfileState, formData: FormData): Pr
   if (!emailChanged && !nameChanged) return { saved: true }
 
   if (emailChanged) {
-    const taken = await db.user.findUnique({ where: { email }, select: { id: true } })
+    const taken = await queryOne<{ id: string }>('SELECT "id" FROM "User" WHERE "email" = $1', [email])
     if (taken) return { error: 'That email is already in use' }
   }
 
-  await db.user.update({
-    where: { id: user.id },
-    // A new address starts unverified — the old confirmation says nothing about it.
-    data: { name, email, ...(emailChanged ? { emailVerifiedAt: null } : {}) },
-  })
+  // A new address starts unverified — the old confirmation says nothing about it.
+  await query(
+    emailChanged
+      ? 'UPDATE "User" SET "name" = $1, "email" = $2, "emailVerifiedAt" = NULL WHERE "id" = $3'
+      : 'UPDATE "User" SET "name" = $1, "email" = $2 WHERE "id" = $3',
+    [name, email, user.id],
+  )
 
   const changes = [nameChanged ? 'Name' : null, emailChanged ? 'Email address' : null].filter(
     (change): change is string => change !== null,

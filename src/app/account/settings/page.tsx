@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { currentUser } from '@/lib/auth'
-import { db } from '@/lib/db'
+import { queryOne } from '@/lib/sql'
 import { ProfileForm } from '@/components/account/ProfileForm'
 import { pageMetadata } from '@/lib/seo'
 
@@ -19,10 +19,11 @@ export default async function SettingsPage() {
   const user = await currentUser().catch(() => null)
   if (!user) redirect('/account/login')
 
-  const { emailVerifiedAt } = (await db.user.findUniqueOrThrow({
-    where: { id: user.id },
-    select: { emailVerifiedAt: true },
-  }))
+  const verified = await queryOne<{ emailVerifiedAt: Date | null }>(
+    'SELECT "emailVerifiedAt" FROM "User" WHERE "id" = $1',
+    [user.id],
+  )
+  const emailVerifiedAt = verified?.emailVerifiedAt ?? null
 
   return (
     <div className="container-ib max-w-md py-16">
