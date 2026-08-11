@@ -13,23 +13,20 @@
     "db:push": "prisma db push",
     "db:seed": "node --experimental-strip-types --env-file-if-exists=.env prisma/seed.ts",
     "db:seed:admin": "node --experimental-strip-types --env-file-if-exists=.env prisma/seed-admin.ts",
-    "db:seed:demo": "node --experimental-strip-types --env-file-if-exists=.env prisma/seed-admin.ts --demo",
-    "cf:build": "opennextjs-cloudflare build",
-    "cf:size": "opennextjs-cloudflare build && wrangler deploy --dry-run",
-    "cf:deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy"
+    "db:seed:demo": "node --experimental-strip-types --env-file-if-exists=.env prisma/seed-admin.ts --demo"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
     "@prisma/adapter-neon": "^7.9.1",
     "@prisma/adapter-pg": "^6.16.2",
     "@prisma/client": "^6.16.2",
+    "@vercel/blob": "^2.8.0",
     "next": "^15.5.4",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "zod": "^4.1.11"
   },
   "devDependencies": {
-    "@opennextjs/cloudflare": "^1.9.1",
     "@tailwindcss/postcss": "^4.1.13",
     "@types/node": "^22.18.6",
     "@types/react": "^19.1.13",
@@ -38,7 +35,6 @@
     "eslint-config-next": "^15.5.4",
     "prisma": "^6.16.2",
     "tailwindcss": "^4.1.13",
-    "typescript": "^5.9.2",
-    "wrangler": "^4.40.2"
+    "typescript": "^5.9.2"
   }
 }

@@ -1,29 +1,24 @@
 import 'server-only'
-import { cache } from 'react'
 import { PrismaClient } from '@/generated/prisma/client'
 import { PrismaNeon } from '@prisma/adapter-neon'
 
-// Neon's serverless driver, not node-postgres: workerd has no complete node:tls,
-// so pg's TLS handshake to Neon hangs until the runtime kills the request. The
-// Neon driver tunnels Postgres over WebSockets. Its Pool supports transactions,
-// which checkout depends on.
+// Neon's serverless driver, not node-postgres: it tunnels Postgres over
+// WebSockets, and its Pool supports the interactive transactions checkout
+// depends on.
 //
-// The client must be created PER REQUEST. Workers refuse to let one request use
-// an I/O object opened by another — a module-level singleton fails the second
-// request with "Cannot perform I/O on behalf of a different request".
-// React's cache() scopes one client to one request; outside a request scope it
-// simply builds a fresh client, which is correct if slower.
+// One client for the process. Serverless instances are reused across requests,
+// so a module-level singleton reuses the connection — a per-request client
+// would open a fresh WebSocket on every request and never close it, leaking
+// against the Neon connection limit.
 
-const getClient = cache((): PrismaClient => {
-  const connectionString = process.env.DATABASE_URL
-  if (!connectionString) throw new Error('DATABASE_URL is not set')
-  return new PrismaClient({ adapter: new PrismaNeon({ connectionString }) })
-})
+const connectionString = process.env.DATABASE_URL
+if (!connectionString) throw new Error('DATABASE_URL is not set')
 
-// A proxy so call sites stay `db.product.findMany(...)` while the client behind
-// them is resolved per request.
-export const db = new Proxy({} as PrismaClient, {
-  get(_target, property, receiver) {
-    return Reflect.get(getClient(), property, receiver)
-  },
-})
+// `next dev` re-evaluates modules on every edit; without the global the client
+// count climbs until Neon refuses new connections.
+const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient }
+
+export const db =
+  globalForPrisma.prisma ?? new PrismaClient({ adapter: new PrismaNeon({ connectionString }) })
+
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = db

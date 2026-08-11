@@ -2,9 +2,9 @@ import { runDueTransitions, sweepLowStock } from '@/server/scheduler'
 
 export const dynamic = 'force-dynamic'
 
-// A Cloudflare cron trigger can point here for exact scheduling. Without one,
-// /api/redirects already runs `runDueTransitions` on middleware's minute poll —
-// this endpoint additionally sweeps low stock, which is too heavy for that path.
+// Vercel Cron points here (see vercel.json). /api/redirects already runs
+// `runDueTransitions` on middleware's minute poll — this endpoint additionally
+// sweeps low stock, which is too heavy for that path.
 //
 // Guarded by a shared secret rather than a session: a scheduler has no cookies.
 
@@ -20,3 +20,7 @@ export async function POST(request: Request) {
 
   return Response.json({ ...transitions, lowStockAlerts })
 }
+
+// Vercel Cron issues GET and signs it `Authorization: Bearer $CRON_SECRET`,
+// which is exactly the guard above. Same handler, no second code path.
+export const GET = POST

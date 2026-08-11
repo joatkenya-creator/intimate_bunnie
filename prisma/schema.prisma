@@ -1,28 +1,16 @@
 // Intimate Bunnie — PostgreSQL schema.
 // Money is stored in integer cents (USD). No floats anywhere near a price.
 
-// The `prisma-client` generator uses the WASM query compiler instead of the
-// Rust query engine. The engine probes the filesystem for libssl and a native
-// binary, which workerd has no filesystem for — that is what took the site
-// down with "[unenv] fs.readdir is not implemented yet".
-// `queryCompiler` replaces the 2.2 MB Rust query engine with a compiler that
-// turns Prisma calls into SQL and hands them to the driver adapter. Turbopack
-// emits the engine once per module layer — RSC and route handlers — so that
-// 2.2 MB was landing in the Worker twice, 1.7 MB of a 2.9 MB gzip budget.
-// It requires driver adapters, which this project already uses everywhere.
+// One client: the app and the seed scripts both run under Node now.
+//
+// `engineType = "client"` keeps the WASM query compiler rather than the Rust
+// query engine. Node could run the Rust engine, but the compiler emits SQL for
+// the driver adapter without shipping a 2.2 MB binary that probes the
+// filesystem for libssl — smaller bundles, faster cold starts, and the driver
+// adapters this project already uses everywhere.
 generator client {
   provider        = "prisma-client"
   output          = "../src/generated/prisma"
-  runtime         = "workerd"
-  moduleFormat    = "esm"
-  engineType      = "client"
-}
-
-// The seed script and any local maintenance script run under Node, which needs
-// a client built for that runtime.
-generator nodeClient {
-  provider        = "prisma-client"
-  output          = "../src/generated/prisma-node"
   runtime         = "nodejs"
   moduleFormat    = "esm"
   engineType      = "client"

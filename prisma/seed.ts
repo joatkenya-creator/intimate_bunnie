@@ -1,4 +1,4 @@
-import { PrismaClient } from '../src/generated/prisma-node/client.ts'
+import { PrismaClient } from '../src/generated/prisma/client.ts'
 import { PrismaPg } from '@prisma/adapter-pg'
 
 // Catalog seed. Images are deterministic remote placeholders for development —

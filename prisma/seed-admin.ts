@@ -1,4 +1,4 @@
-import { PrismaClient } from '../src/generated/prisma-node/client.ts'
+import { PrismaClient } from '../src/generated/prisma/client.ts'
 import { PrismaPg } from '@prisma/adapter-pg'
 import { SYSTEM_ROLES } from '../src/lib/permissions.ts'
 import { hashPassword } from '../src/lib/password.ts'

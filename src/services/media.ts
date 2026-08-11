@@ -27,7 +27,7 @@ export const PLACEHOLDER_IMAGE =
 
 export class MediaStorageUnconfigured extends Error {
   constructor() {
-    super('No media bucket is configured. Add an R2 binding named MEDIA_BUCKET, or add media by URL.')
+    super('No media store is configured. Connect a Vercel Blob store, or add media by URL.')
   }
 }
 
@@ -44,30 +44,22 @@ export function storageKey(folder: string, filename: string): string {
 }
 
 /**
- * R2 through the Worker binding. Reached with a dynamic import so `next dev`
- * under Node never loads the Cloudflare adapter, and so an unbound deployment
- * fails with a sentence an operator can act on instead of a type error.
+ * Vercel Blob. The token is injected by the Blob store integration, so its
+ * absence is how an unconfigured deployment is detected — and it fails with a
+ * sentence an operator can act on instead of a type error.
  */
 export async function getMediaStorage(): Promise<MediaStorageProvider> {
-  const publicBase = process.env.MEDIA_PUBLIC_BASE?.replace(/\/$/, '')
-
-  try {
-    const { getCloudflareContext } = await import('@opennextjs/cloudflare')
-    const bucket = (getCloudflareContext().env as Record<string, unknown>).MEDIA_BUCKET as
-      | { put(key: string, value: ArrayBuffer, options?: unknown): Promise<unknown> }
-      | undefined
-
-    if (bucket && publicBase) {
-      return {
-        id: 'r2',
-        async put(key, file) {
-          await bucket.put(key, await file.arrayBuffer(), { httpMetadata: { contentType: file.type } })
-          return `${publicBase}/${key}`
-        },
-      }
+  if (process.env.BLOB_READ_WRITE_TOKEN) {
+    const { put } = await import('@vercel/blob')
+    return {
+      id: 'vercel-blob',
+      async put(key, file) {
+        // storageKey() already carries a random stamp; a second suffix would
+        // make the returned URL unguessable from the key we just built.
+        const { url } = await put(key, file, { access: 'public', addRandomSuffix: false })
+        return url
+      },
     }
-  } catch {
-    // Not running on Workers — fall through to the unconfigured provider.
   }
 
   return {
