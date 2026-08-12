@@ -1,6 +1,7 @@
 'use server'
 
 import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 import { z } from 'zod'
 import { query, queryOne } from '@/lib/sql'
 import {
@@ -13,7 +14,8 @@ import {
   verifyToken,
 } from '@/lib/auth'
 import { absoluteUrl } from '@/config/site'
-import { rateLimit } from '@/lib/security'
+import { rateLimit, clientIp } from '@/lib/security'
+import { checkBotId } from 'botid/server'
 import { newId } from '@/lib/ids'
 import { sendPasswordChanged, sendPasswordReset, sendVerifyEmail, sendWelcome } from '@/services/email'
 
@@ -37,20 +39,32 @@ export async function register(_prev: AuthState, formData: FormData): Promise<Au
   })
   if (!parsed.success) return { error: parsed.error.issues[0].message }
 
+  // Every signup sends two emails, so an unmetered form is a spam cannon
+  // pointed at our own sending reputation. Loose enough for a shared office or
+  // a carrier NAT to sign up a few people in one sitting.
+  if (!rateLimit(`signup:${clientIp(await headers())}`, 10, 60 * 60_000)) {
+    return { error: 'Too many accounts created from here. Try again in an hour.' }
+  }
+
+  // After the counter, never before it: the counter is free and local, while a
+  // BotID check with Deep Analysis on is billed per call. A flood should hit
+  // the free wall first.
+  if ((await checkBotId()).isBot) return { error: 'We could not verify this request. Please try again.' }
+
   const email = parsed.data.email.toLowerCase()
   if (await queryOne<{ id: string }>('SELECT "id" FROM "User" WHERE "email" = $1', [email])) {
     return { error: 'An account with that email already exists' }
   }
 
-  const user = (await queryOne<{ id: string }>(
-    'INSERT INTO "User" ("id", "email", "name", "passwordHash") VALUES ($1,$2,$3,$4) RETURNING "id"',
+  const user = (await queryOne<{ id: string; role: string; createdAt: Date }>(
+    'INSERT INTO "User" ("id", "email", "name", "passwordHash") VALUES ($1,$2,$3,$4) RETURNING "id", "role", "createdAt"',
     [newId(), email, parsed.data.name ?? null, await hashPassword(parsed.data.password)],
   ))!
 
   // Bound to the address itself, so a link mailed to an old address cannot
   // verify a new one. Neither send can throw; both run before the redirect.
   const token = await signToken('verify-email', user.id, VERIFY_TTL_HOURS * 3600, email)
-  await sendWelcome(email, parsed.data.name)
+  await sendWelcome({ name: parsed.data.name, email, role: user.role, createdAt: new Date(user.createdAt) })
   await sendVerifyEmail(email, absoluteUrl(`/account/verify?token=${token}`), VERIFY_TTL_HOURS)
 
   await createSession(user.id)
@@ -63,9 +77,25 @@ export async function requestPasswordReset(_prev: AuthState, formData: FormData)
   // way to test which addresses are registered.
   if (!parsed.success) return { sent: true }
 
+  const email = parsed.data.toLowerCase()
+
+  // Two axes, because they stop different attacks. Per address caps how much
+  // mail one victim's inbox can be made to receive; per IP stops one script
+  // walking a list of addresses. Over either limit we send nothing and still
+  // answer "sent" — a distinguishable response would undo the line above.
+  if (
+    !rateLimit(`reset-mail:${email}`, 3, 60 * 60_000) ||
+    !rateLimit(`reset-ip:${clientIp(await headers())}`, 10, 60 * 60_000)
+  ) {
+    return { sent: true }
+  }
+
+  // Answered identically to the real path, for the same reason as above.
+  if ((await checkBotId()).isBot) return { sent: true }
+
   const user = await queryOne<{ id: string; email: string; passwordHash: string }>(
     'SELECT "id", "email", "passwordHash" FROM "User" WHERE "email" = $1',
-    [parsed.data.toLowerCase()],
+    [email],
   )
 
   if (user) {
@@ -123,6 +153,10 @@ export async function login(_prev: AuthState, formData: FormData): Promise<AuthS
   if (!rateLimit(`login:${email}`, 8, 15 * 60_000)) {
     return { error: 'Too many attempts. Wait a few minutes and try again.' }
   }
+
+  // Credential stuffing is the attack BotID is best at: the same message as a
+  // wrong password, so a stuffing run learns nothing from being blocked.
+  if ((await checkBotId()).isBot) return { error: 'Incorrect email or password' }
 
   const user = await queryOne<{ id: string; passwordHash: string; role: string; status: string }>(
     'SELECT "id", "passwordHash", "role", "status" FROM "User" WHERE "email" = $1',

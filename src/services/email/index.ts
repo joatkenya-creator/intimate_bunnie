@@ -1,7 +1,7 @@
 import 'server-only'
-import { site, absoluteUrl } from '@/config/site'
+import { site } from '@/config/site'
 import * as t from './templates'
-import type { OrderMail } from './templates'
+import type { OrderMail, WelcomeUser } from './templates'
 
 export * from './templates'
 
@@ -58,8 +58,7 @@ async function deliver(to: string, mail: t.Mail): Promise<boolean> {
   }
 }
 
-export const sendWelcome = (to: string, name?: string | null): Promise<boolean> =>
-  deliver(to, t.welcome({ name, shopUrl: absoluteUrl('/shop') }))
+export const sendWelcome = (user: WelcomeUser): Promise<boolean> => deliver(user.email, t.welcome(user))
 
 export const sendVerifyEmail = (to: string, url: string, expiresInHours: number): Promise<boolean> =>
   deliver(to, t.verifyEmail({ url, expiresInHours }))

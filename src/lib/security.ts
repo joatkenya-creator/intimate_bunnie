@@ -28,8 +28,12 @@ export function rateLimit(key: string, limit: number, windowMs: number): boolean
   return bucket.count <= limit
 }
 
-export function clientIp(request: Request): string {
-  const head = request.headers
+/**
+ * Route handlers hold a Request; Server Actions only get `await headers()`.
+ * Both carry the same forwarding headers, so both are accepted.
+ */
+export function clientIp(source: Request | Headers): string {
+  const head = source instanceof Headers ? source : source.headers
   return (
     head.get('cf-connecting-ip') ??
     head.get('x-forwarded-for')?.split(',')[0]?.trim() ??

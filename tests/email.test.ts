@@ -28,7 +28,7 @@ const order = {
 
 test('every template renders both an HTML and a plain-text body', () => {
   const mails = [
-    welcome({ name: 'Ada', shopUrl: 'https://intimatebunnie.com/shop' }),
+    welcome({ name: 'Ada', email: 'ada@example.com', role: 'CUSTOMER', createdAt: new Date('2026-08-11T09:00:00Z') }),
     verifyEmail({ url: 'https://intimatebunnie.com/account/verify?token=t', expiresInHours: 72 }),
     passwordReset({ url: 'https://intimatebunnie.com/account/reset?token=t', expiresInMinutes: 60 }),
     preferencesUpdated({ preferences: [['New arrivals', 'On']] }),
@@ -63,7 +63,28 @@ test('order totals are rendered as money, and the maths shown adds up', () => {
 test('user-supplied text cannot inject markup into the HTML body', () => {
   assert.equal(esc('<script>alert(1)</script>'), '&lt;script&gt;alert(1)&lt;/script&gt;')
 
-  const mail = welcome({ name: '<img src=x onerror=alert(1)>', shopUrl: 'https://intimatebunnie.com/shop' })
+  const mail = welcome({
+    name: '<img src=x onerror=alert(1)>',
+    email: 'ada@example.com',
+    role: 'CUSTOMER',
+    createdAt: new Date('2026-08-11T09:00:00Z'),
+  })
   assert.doesNotMatch(mail.html, /<img/)
   assert.ok(mail.html.includes('&lt;img'))
+})
+
+test('the welcome email renders the account details, and drops rows it has no value for', () => {
+  const base = { email: 'ada@example.com', role: 'CUSTOMER', createdAt: new Date('2026-08-11T09:00:00Z') }
+
+  const plain = welcome(base)
+  assert.ok(plain.html.includes('>Customer<'), 'the role enum is rendered capitalised, not shouted')
+  assert.ok(plain.html.includes('11 Aug 2026'), 'member since is dd MMM yyyy')
+  assert.doesNotMatch(plain.html, /Membership/, 'the optional row is omitted, not left blank')
+  assert.doesNotMatch(plain.html, /Full Name/, 'a nameless signup shows no empty name row')
+  assert.equal(plain.subject, 'Welcome to Intimate Bunnie')
+
+  const withOrg = welcome({ ...base, name: 'Ada', org: 'VIP' })
+  assert.ok(withOrg.html.includes('Membership') && withOrg.html.includes('>VIP<'))
+  assert.ok(withOrg.html.includes('Welcome, Ada!'))
+  assert.ok(withOrg.text.includes('Membership: VIP'), 'the plain-text twin carries the same rows')
 })

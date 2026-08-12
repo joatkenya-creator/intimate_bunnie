@@ -102,12 +102,228 @@ ${blocks.map(renderBlockHtml).join('\n')}
 
 // ── The eight transactional emails ──────────────────────────────────────────
 
-export function welcome(input: { name?: string | null; shopUrl: string }): Mail {
-  return render(`Welcome to ${site.name}`, input.name ? `Hello, ${input.name}` : 'Hello', [
-    P('Your account is ready. Everything you order ships in plain packaging with a discreet billing descriptor — no branding, no judgment.'),
-    P('Save the pieces you like to your wishlist, and your order history stays in one place.'),
-    Button(input.shopUrl, 'Start shopping'),
-  ])
+export type WelcomeUser = {
+  name?: string | null
+  email: string
+  role: string
+  createdAt: Date
+  /** Staff segment or tier. Absent for a plain customer — the row is dropped. */
+  org?: string | null
+}
+
+/** CUSTOMER -> Customer. The column is an enum, so shouting it back reads wrong. */
+function titleCase(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase()
+}
+
+/** en-GB, UTC — a fixed string, so an email reads the same wherever it is opened. */
+function formatDay(date: Date): string {
+  return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' })
+}
+
+// The only template that does not go through render(): it is a full standalone
+// document with its own palette, not a stack of blocks. Kept here anyway so the
+// copy stays reviewable in one place and the plain-text twin cannot drift.
+export function welcome(user: WelcomeUser): Mail {
+  const subject = `Welcome to ${site.name}`
+  const rows: [string, string][] = [
+    ...(user.name ? ([['Full Name', user.name]] as [string, string][]) : []),
+    ['Email Address', user.email],
+    ...(user.org ? ([['Membership', user.org]] as [string, string][]) : []),
+  ]
+  const role = titleCase(user.role)
+  const since = formatDay(user.createdAt)
+
+  const html = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${esc(subject)}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Georgia', 'Times New Roman', serif;
+      background: #f0ede8;
+      padding: 40px 16px;
+      color: #2d2d2d;
+    }
+    .wrapper {
+      max-width: 600px;
+      margin: 0 auto;
+      background: #ffffff;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.10);
+    }
+    .header {
+      background: linear-gradient(135deg, #1a3a2a 0%, #2d6a4f 100%);
+      background-color: #2d6a4f;
+      padding: 48px 40px 36px;
+      text-align: center;
+    }
+    .header .icon { font-size: 40px; display: block; margin-bottom: 12px; }
+    .header h1 {
+      color: #e8d5a3;
+      font-size: 28px;
+      font-weight: normal;
+      letter-spacing: 2px;
+    }
+    .header .subtitle {
+      color: #95c4a8;
+      font-size: 12px;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      margin-top: 8px;
+    }
+    .header .rule {
+      width: 60px;
+      height: 3px;
+      background: #e8d5a3;
+      margin: 20px auto 0;
+      border-radius: 2px;
+      font-size: 0;
+      line-height: 0;
+    }
+    .body { padding: 44px 40px; }
+    .body h2 {
+      color: #1a3a2a;
+      font-size: 24px;
+      font-weight: normal;
+      margin-bottom: 16px;
+    }
+    .body p {
+      color: #555;
+      line-height: 1.8;
+      font-size: 15px;
+      margin-bottom: 16px;
+    }
+    .detail-card {
+      background: #f7f9f8;
+      border: 1px solid #d4e8dc;
+      border-radius: 8px;
+      padding: 24px 28px;
+      margin: 28px 0;
+    }
+    .detail-card h3 {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 3px;
+      color: #2d6a4f;
+      margin-bottom: 16px;
+    }
+    .detail-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    .detail-table td {
+      padding: 10px 0;
+      border-bottom: 1px solid #e4ede8;
+    }
+    .detail-table tr:last-child td { border-bottom: none; }
+    .detail-table .label { color: #888; text-align: left; }
+    .detail-table .value {
+      color: #1a3a2a;
+      font-weight: bold;
+      text-align: right;
+    }
+    .role-badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      background: #e8f5ee;
+      color: #2d6a4f;
+      border: 1px solid #b7ddc8;
+    }
+    .divider { width: 100%; height: 1px; background: #e8ede9; margin: 28px 0; }
+    .footer {
+      background: #f7f9f8;
+      border-top: 1px solid #e4ede8;
+      padding: 28px 40px;
+      text-align: center;
+    }
+    .footer p { color: #999; font-size: 12px; line-height: 1.7; }
+    .footer .brand {
+      color: #2d6a4f;
+      font-size: 14px;
+      font-weight: bold;
+      margin-bottom: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="header">
+      <span class="icon">&#128048;</span>
+      <h1>${esc(site.name)}</h1>
+      <p class="subtitle">${esc(site.tagline)}</p>
+      <div class="rule">&nbsp;</div>
+    </div>
+
+    <div class="body">
+      <h2>Welcome${user.name ? `, ${esc(user.name)}` : ''}!</h2>
+      <p>
+        Your account has been created successfully. We are delighted to have you
+        join the <strong>${esc(site.name)}</strong> community.
+        Your wishlist, saved addresses and full order history now live in one
+        place — and everything you order ships in plain packaging with a discreet
+        billing descriptor.
+      </p>
+
+      <div class="detail-card">
+        <h3>Your Account Details</h3>
+        <table class="detail-table">
+${rows
+  .map(([label, value]) => `          <tr>\n            <td class="label">${esc(label)}</td>\n            <td class="value">${esc(value)}</td>\n          </tr>`)
+  .join('\n')}
+          <tr>
+            <td class="label">Account Role</td>
+            <td class="value"><span class="role-badge">${esc(role)}</span></td>
+          </tr>
+          <tr>
+            <td class="label">Member Since</td>
+            <td class="value">${esc(since)}</td>
+          </tr>
+        </table>
+      </div>
+
+      <div class="divider"></div>
+
+      <p>Take your time looking around — we are here whenever you have a question, and we answer plainly.</p>
+      <p style="margin-top: 32px; color: #1a3a2a;">
+        Warm regards,<br>
+        <strong>The ${esc(site.name)} Team</strong>
+      </p>
+    </div>
+
+    <div class="footer">
+      <p class="brand">${esc(site.name)}</p>
+      <p>
+        If you did not create this account, please ignore this email or contact
+        support immediately.
+      </p>
+    </div>
+  </div>
+</body>
+</html>`
+
+  const text = [
+    site.name.toUpperCase(),
+    '',
+    `Welcome${user.name ? `, ${user.name}` : ''}!`,
+    '',
+    `Your account has been created successfully. We are delighted to have you join the ${site.name} community. Your wishlist, saved addresses and full order history now live in one place — and everything you order ships in plain packaging with a discreet billing descriptor.`,
+    '',
+    'YOUR ACCOUNT DETAILS',
+    [...rows, ['Account Role', role], ['Member Since', since]].map(([l, v]) => `${l}: ${v}`).join('\n'),
+    '',
+    'Take your time looking around — we are here whenever you have a question, and we answer plainly.',
+    '',
+    `Warm regards,\nThe ${site.name} Team`,
+    '',
+    '—',
+    'If you did not create this account, please ignore this email or contact support immediately.',
+  ].join('\n\n')
+
+  return { subject, html, text }
 }
 
 export function verifyEmail(input: { url: string; expiresInHours: number }): Mail {

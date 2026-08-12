@@ -1,4 +1,5 @@
 import type { NextConfig } from 'next'
+import { withBotId } from 'botid/next/config'
 
 const securityHeaders = [
   { key: 'X-Content-Type-Options', value: 'nosniff' },
@@ -28,4 +29,6 @@ const nextConfig: NextConfig = {
   },
 }
 
-export default nextConfig
+// withBotId adds the first-party rewrites that serve the challenge from our own
+// origin — a third-party script URL is the first thing an ad-blocker drops.
+export default withBotId(nextConfig)

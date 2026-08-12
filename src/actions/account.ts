@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { query, queryOne } from '@/lib/sql'
 import { requireUser, signToken } from '@/lib/auth'
+import { rateLimit } from '@/lib/security'
 import { absoluteUrl } from '@/config/site'
 import { sendProfileUpdated, sendVerifyEmail } from '@/services/email'
 
@@ -35,7 +36,15 @@ export async function updateProfile(_prev: ProfileState, formData: FormData): Pr
   const emailChanged = email !== user.email
   const nameChanged = name !== user.name
 
+  // A no-op save sends nothing, so it costs nothing and is not counted.
   if (!emailChanged && !nameChanged) return { saved: true }
+
+  // Keyed by account, not IP: this action is authenticated, and every real
+  // change mails the old address — repointing the email repeatedly is how you
+  // would use a stolen session to bury the "your details changed" warning.
+  if (!rateLimit(`profile:${user.id}`, 5, 60 * 60_000)) {
+    return { error: 'Too many changes just now. Try again in an hour.' }
+  }
 
   if (emailChanged) {
     const taken = await queryOne<{ id: string }>('SELECT "id" FROM "User" WHERE "email" = $1', [email])

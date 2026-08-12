@@ -121,6 +121,35 @@ production, and `.env` is gitignored. `lib/db.ts` and `lib/auth.ts` are
 `server-only`, so importing either from a client component is a build error
 rather than a leak.
 
+## Bot protection
+
+Vercel BotID (invisible challenge, no visible CAPTCHA). Three parts, and all
+three must agree or the check fails closed:
+
+1. `withBotId()` in `next.config.ts` — serves the challenge from our own origin,
+   so an ad-blocker cannot drop it.
+2. `src/instrumentation-client.ts` — the list of protected paths. Server Actions
+   post to the path of the page that invoked them, so these are page routes.
+3. `checkBotId()` in the action itself.
+
+| Path | Action | On detection |
+| --- | --- | --- |
+| `/checkout` | `placeOrder` | Refuses with a retry message |
+| `/account/login` | `login` | "Incorrect email or password" — same as a wrong password |
+| `/account/register` | `register` | Refuses with a retry message |
+| `/account/forgot` | `requestPasswordReset` | Answers `sent`, mails nothing |
+
+Each check runs **after** the rate-limit counter: the counter is free and local,
+`checkBotId()` is billed per call once Deep Analysis is on.
+
+Basic checks are free on every plan and are active as soon as this is deployed.
+**Deep Analysis** is the dashboard half — Project → Firewall → Rules → *Vercel
+BotID Deep Analysis* — and is billed per `checkBotId()` call on Pro.
+
+Local development always returns `isBot: false`, so these paths behave normally
+in `next dev`. Testing with `curl` against production will be blocked: the
+challenge needs a real browser session.
+
 ## Rate limiting
 
 `src/lib/security.ts` holds a fixed-window counter, applied to:
@@ -129,6 +158,11 @@ rather than a leak.
 | --- | --- |
 | `/admin`, `/api/admin` (middleware, per IP) | 240 / minute |
 | Login (per **account**, not per IP) | 8 / 15 minutes |
+| Registration (per IP) | 10 / hour |
+| Password reset (per **address**) | 3 / hour |
+| Password reset (per IP) | 10 / hour |
+| Profile change (per account) | 5 / hour |
+| Checkout (per IP) | 10 / 10 minutes |
 | Admin global search | 60 / minute |
 | Media upload | 60 / minute |
 | Report export | 20 / minute |

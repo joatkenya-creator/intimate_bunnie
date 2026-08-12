@@ -1,8 +1,11 @@
 'use server'
 
+import { headers } from 'next/headers'
 import { z } from 'zod'
 import { query, transaction } from '@/lib/sql'
 import { currentUser } from '@/lib/auth'
+import { rateLimit, clientIp } from '@/lib/security'
+import { checkBotId } from 'botid/server'
 import { quoteTotals, formatUSD } from '@/lib/money'
 import { notify } from '@/server/notifications'
 import { getPaymentProvider } from '@/services/payment'
@@ -33,6 +36,20 @@ export type CheckoutResult = { ok: true; orderNumber: string } | { ok: false; er
 export async function placeOrder(input: CheckoutInput): Promise<CheckoutResult> {
   const parsed = checkoutSchema.safeParse(input)
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? 'Check your details' }
+
+  // Card testing is a scripted loop of small orders against stolen numbers. The
+  // dev provider makes it harmless today and a chargeback problem the day a
+  // real one replaces it. A genuine shopper who mistypes a card a few times
+  // stays well inside this.
+  if (!rateLimit(`checkout:${clientIp(await headers())}`, 10, 10 * 60_000)) {
+    return { ok: false, error: 'Too many attempts. Wait a few minutes and try again.' }
+  }
+
+  // The counter caps the volume; BotID catches the headless browser doing it at
+  // a human pace. Checked after the counter because it is the billable one.
+  if ((await checkBotId()).isBot) {
+    return { ok: false, error: 'We could not verify this request. Refresh the page and try again.' }
+  }
 
   const { lines, email, fullName, line1, line2, city, state, zip } = parsed.data
 

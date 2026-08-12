@@ -1,13 +1,23 @@
 import Script from 'next/script'
+import { Analytics as VercelAnalytics } from '@vercel/analytics/next'
+import { SpeedInsights } from '@vercel/speed-insights/next'
 
 // Thin wrapper, no analytics SDKs. Each script loads only when its ID is
 // configured, and always after hydration so it never blocks paint.
+//
+// The two Vercel ones need no ID: both scripts are served from this origin
+// (/_vercel/…) and only record on a Vercel deployment, so they are safe to
+// render unconditionally. Rendered here rather than in the layout means /admin,
+// which returns before this component, stays out of the visitor counts and out
+// of the Core Web Vitals — a slow admin table must not read as a slow store.
 export function Analytics() {
   const ga = process.env.NEXT_PUBLIC_GA_ID
   const clarity = process.env.NEXT_PUBLIC_CLARITY_ID
 
   return (
     <>
+      <VercelAnalytics />
+      <SpeedInsights />
       {ga && (
         <>
           <Script src={`https://www.googletagmanager.com/gtag/js?id=${ga}`} strategy="afterInteractive" />
