@@ -1,6 +1,6 @@
 import 'server-only'
 import { cookies } from 'next/headers'
-import { queryOne } from './sql'
+import { query, queryOne } from './sql'
 import { b64url, fromB64url, timingSafeEqual } from './password'
 import {
   hmac,
@@ -108,6 +108,28 @@ export async function requireAdmin() {
   const user = await currentUser()
   if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) throw new Error('FORBIDDEN')
   return user
+}
+
+/**
+ * Erases the account. Addresses, wishlist rows, and the store-credit ledger
+ * cascade with it; orders keep their row with `userId` nulled, so the books
+ * still balance after the person is gone.
+ *
+ * CUSTOMER rows only, and that check lives here rather than at each call site —
+ * both the admin button and the self-service form route through this, and a
+ * staff row leaving by either door could take the store's last super
+ * administrator with it. Staff removal belongs in /admin/staff.
+ *
+ * Returns the deleted email for the audit entry, or null if it refused.
+ */
+export async function deleteCustomerAccount(id: string): Promise<{ email: string } | null> {
+  const row = await queryOne<{ email: string; role: string }>(
+    'SELECT "email", "role" FROM "User" WHERE "id" = $1',
+    [id],
+  )
+  if (!row || row.role !== 'CUSTOMER') return null
+  await query('DELETE FROM "User" WHERE "id" = $1', [id])
+  return { email: row.email }
 }
 
 /**

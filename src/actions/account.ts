@@ -1,9 +1,11 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
 import { z } from 'zod'
 import { query, queryOne } from '@/lib/sql'
-import { requireUser, signToken } from '@/lib/auth'
+import { deleteCustomerAccount, destroySession, requireUser, signToken, verifyPassword } from '@/lib/auth'
+import { newId } from '@/lib/ids'
 import { rateLimit } from '@/lib/security'
 import { absoluteUrl } from '@/config/site'
 import { sendProfileUpdated, sendVerifyEmail } from '@/services/email'
@@ -75,4 +77,50 @@ export async function updateProfile(_prev: ProfileState, formData: FormData): Pr
   revalidatePath('/account')
   revalidatePath('/account/settings')
   return { saved: true }
+}
+
+export type DeleteState = { error?: string }
+
+/**
+ * Self-service deletion. The password is re-checked here rather than trusted
+ * from the session cookie: a borrowed laptop with the account still signed in
+ * is the threat, and this is the one action nothing can undo.
+ */
+export async function deleteAccount(_prev: DeleteState, formData: FormData): Promise<DeleteState> {
+  let user
+  try {
+    user = await requireUser()
+  } catch {
+    return { error: 'Sign in again to delete your account' }
+  }
+
+  if (String(formData.get('confirm') ?? '').trim().toUpperCase() !== 'DELETE') {
+    return { error: 'Type DELETE to confirm' }
+  }
+
+  // Keyed by account: this is authenticated, so the guess being throttled is a
+  // guess at THIS password, by someone already holding the session.
+  if (!rateLimit(`delete-account:${user.id}`, 5, 60 * 60_000)) {
+    return { error: 'Too many attempts. Try again in an hour.' }
+  }
+
+  const row = await queryOne<{ passwordHash: string }>('SELECT "passwordHash" FROM "User" WHERE "id" = $1', [user.id])
+  if (!row || !(await verifyPassword(String(formData.get('password') ?? ''), row.passwordHash))) {
+    return { error: 'That password is not right' }
+  }
+
+  if (!(await deleteCustomerAccount(user.id))) {
+    return { error: 'Staff accounts cannot be closed here. Ask a super administrator.' }
+  }
+
+  // Written before the cookie goes, and the row it names no longer exists — so
+  // `actorId` is deliberately left null rather than pointing at a dead id.
+  await query('INSERT INTO "AuditLog" ("id", "actor", "action") VALUES ($1,$2,$3)', [
+    newId(),
+    user.email,
+    'account.delete',
+  ]).catch(() => null)
+
+  await destroySession()
+  redirect('/')
 }

@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { currentUser } from '@/lib/auth'
 import { queryOne } from '@/lib/sql'
 import { ProfileForm } from '@/components/account/ProfileForm'
+import { DeleteAccountForm } from '@/components/account/DeleteAccountForm'
 import { pageMetadata } from '@/lib/seo'
 
 export const dynamic = 'force-dynamic'
@@ -45,6 +46,10 @@ export default async function SettingsPage() {
         </Link>
         .
       </p>
+
+      {/* Staff close their account through /admin/staff — the action refuses
+          them anyway, but there is no reason to offer the door. */}
+      {user.role === 'CUSTOMER' && <DeleteAccountForm />}
     </div>
   )
 }

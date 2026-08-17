@@ -1,7 +1,9 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
 import { db } from '@/lib/db'
+import { deleteCustomerAccount } from '@/lib/auth'
 import { auditData } from '@/lib/rbac'
 import { run } from '@/server/guard'
 import { toBool, toCents, toList, toStringOrNull, type ActionState } from '@/lib/form'
@@ -53,6 +55,32 @@ export async function addStoreCredit(_prev: ActionState, form: FormData): Promis
     revalidatePath(`/admin/customers/${userId}`)
     return { ok: `${cents > 0 ? 'Issued' : 'Deducted'} $${Math.abs(cents / 100).toFixed(2)}` }
   })
+}
+
+/**
+ * Hard delete. `customers.delete` alone is not the gate: the Administrator role
+ * holds `customers.*`, and erasing a person is not a day-to-day operation — so
+ * the coarse role is checked on top of the permission.
+ *
+ * `redirect` throws NEXT_REDIRECT, which `run`'s catch would turn into "Something
+ * went wrong". It goes outside, after the state comes back.
+ */
+export async function deleteCustomer(_prev: ActionState, form: FormData): Promise<ActionState> {
+  const state = await run('customers.delete', async (admin) => {
+    if (admin.role !== 'SUPER_ADMIN') return { error: 'Only a super administrator can delete an account.' }
+
+    const id = String(form.get('id'))
+    const deleted = await deleteCustomerAccount(id)
+    if (!deleted) return { error: 'Only customer accounts can be deleted here — staff go through Staff & roles.' }
+
+    await db.auditLog.create({ data: auditData(admin, 'customer.delete', id, { email: deleted.email }) })
+    revalidatePath('/admin/customers')
+    return { ok: `Deleted ${deleted.email}` }
+  })
+
+  // The detail page it was called from now 404s, so leave it.
+  if (state.ok) redirect('/admin/customers')
+  return state
 }
 
 export async function bulkCustomers(_prev: ActionState, form: FormData): Promise<ActionState> {

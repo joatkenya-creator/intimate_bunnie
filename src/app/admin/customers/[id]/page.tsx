@@ -3,14 +3,15 @@ import { notFound } from 'next/navigation'
 import { db } from '@/lib/db'
 import { requirePagePermission, hasPermission } from '@/lib/rbac'
 import { formatUSD } from '@/lib/money'
-import { updateCustomer, addStoreCredit } from '@/actions/admin/customers'
+import { updateCustomer, addStoreCredit, deleteCustomer } from '@/actions/admin/customers'
 import { PageHeader, Panel, Badge, toneFor, StatCard, DefinitionList, EmptyState, formatDate, formatDateTime } from '@/components/admin/ui'
 import { AdminForm, TextField, TextArea, SelectField, Toggle } from '@/components/admin/forms'
+import { RowAction } from '@/components/admin/RowAction'
 
 export const dynamic = 'force-dynamic'
 
 export default async function CustomerDetail({ params }: { params: Promise<{ id: string }> }) {
-  await requirePagePermission('customers.read')
+  const admin = await requirePagePermission('customers.read')
   const { id } = await params
   const mayWrite = await hasPermission('customers.write')
 
@@ -197,6 +198,24 @@ export default async function CustomerDetail({ params }: { params: Promise<{ id:
               ]}
             />
           </Panel>
+
+          {/* Super administrators only — the Administrator role holds
+              `customers.*`, and this is not a day-to-day operation. */}
+          {admin.role === 'SUPER_ADMIN' && customer.role === 'CUSTOMER' && (
+            <Panel
+              title="Danger zone"
+              description="Removes the account, addresses, wishlist, and credit ledger. Past orders are kept, detached from the customer."
+            >
+              <RowAction
+                action={deleteCustomer}
+                id={customer.id}
+                label="Delete account"
+                pendingLabel="Deleting…"
+                variant="danger"
+                confirm={`Permanently delete ${customer.email}? This cannot be undone.`}
+              />
+            </Panel>
+          )}
 
           {customer.addresses.length > 0 && (
             <Panel title="Addresses">

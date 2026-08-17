@@ -58,17 +58,21 @@ local development works with no provider account.
    - `TXT` on `send.intimatebunnie.com` — SPF for the bounce path.
    - `TXT` on `resend._domainkey` — DKIM.
 3. Wait for **Verified**.
-4. Add DMARC once DKIM passes — start in monitor mode:
-   `_dmarc` → `TXT` → `v=DMARC1; p=none; rua=mailto:care@intimatebunnie.com`
-   Move to `p=quarantine` after a couple of weeks of clean reports.
-5. Create an API key (sending permission only) and set the secrets:
+4. Create an API key (**sending access only**) and set it in Vercel → Settings →
+   Environment Variables (Production), alongside `EMAIL_FROM` and
+   `EMAIL_REPLY_TO`. Redeploy — the Worker reads them at runtime, but nothing is
+   sent until the key exists in that environment.
 
-```sh
-wrangler secret put RESEND_API_KEY
-wrangler secret put EMAIL_FROM       # Intimate Bunnie <care@intimatebunnie.com>
-wrangler secret put EMAIL_REPLY_TO   # care@intimatebunnie.com
-```
+DMARC is already live in monitor mode (`p=none`, reporting to Cloudflare). Leave
+it there for a couple of weeks after Resend starts sending, then tighten to
+`p=quarantine` once the reports are clean.
 
+> **Leave the root SPF alone.** It reads
+> `v=spf1 include:_spf.mx.cloudflare.net ~all` and belongs to inbound
+> forwarding. Resend's SPF lives on `send.intimatebunnie.com` because that is
+> its return-path, so the two never meet. What aligns the visible
+> `From: care@intimatebunnie.com` for DMARC is **DKIM**, not SPF.
+>
 > **One SPF record per hostname.** If a name ever needs two `include:`s, merge
 > them into a single `v=spf1 … ~all` TXT. Two SPF records on one name is a
 > permanent SPF failure, not a fallback.
@@ -79,6 +83,10 @@ wrangler secret put EMAIL_REPLY_TO   # care@intimatebunnie.com
 
 Cloudflare dashboard → the `intimatebunnie.com` zone → **Email** → **Email
 Routing**.
+
+**Already done:** the zone's MX records point at `route1/2/3.mx.cloudflare.net`
+and the root SPF includes `_spf.mx.cloudflare.net`, so routing is enabled. What
+remains is confirming the destination and the rule below.
 
 1. **Destination addresses** → add `yowens@yoassoc.com`. Cloudflare emails that
    address a verification link — it must be clicked before any rule works.
@@ -98,7 +106,11 @@ is mailed to `care@`, and only this rule delivers it.
 
 ---
 
-## 4. Sending *as* `care@` from `yowens@yoassoc.com`
+## 4. Sending *as* `care@` from `yowens@yoassoc.com` — optional
+
+Nothing in the store depends on this. Steps 2 and 3 are what make the site's
+email work; this step only decides whether a human replying to a customer
+appears as `care@intimatebunnie.com` or as `yowens@yoassoc.com`.
 
 In the mailbox for `yowens@yoassoc.com` (Gmail / Google Workspace):
 
