@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
 import { query, queryOne } from '@/lib/sql'
-import { deleteCustomerAccount, destroySession, requireUser, signToken, verifyPassword } from '@/lib/auth'
+import { deleteCustomerAccounts, destroySession, requireUser, signToken, verifyPassword } from '@/lib/auth'
 import { newId } from '@/lib/ids'
 import { rateLimit } from '@/lib/security'
 import { absoluteUrl } from '@/config/site'
@@ -109,9 +109,8 @@ export async function deleteAccount(_prev: DeleteState, formData: FormData): Pro
     return { error: 'That password is not right' }
   }
 
-  if (!(await deleteCustomerAccount(user.id))) {
-    return { error: 'Staff accounts cannot be closed here. Ask a super administrator.' }
-  }
+  const [deleted] = await deleteCustomerAccounts([user.id])
+  if (!deleted) return { error: 'Staff accounts cannot be closed here. Ask a super administrator.' }
 
   // Written before the cookie goes, and the row it names no longer exists — so
   // `actorId` is deliberately left null rather than pointing at a dead id.

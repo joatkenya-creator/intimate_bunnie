@@ -111,25 +111,27 @@ export async function requireAdmin() {
 }
 
 /**
- * Erases the account. Addresses, wishlist rows, and the store-credit ledger
- * cascade with it; orders keep their row with `userId` nulled, so the books
- * still balance after the person is gone.
+ * Erases accounts. Addresses, wishlist rows, and the store-credit ledger cascade
+ * with them; orders keep their row with `userId` nulled, so the books still
+ * balance after the person is gone.
  *
- * CUSTOMER rows only, and that check lives here rather than at each call site —
- * both the admin button and the self-service form route through this, and a
- * staff row leaving by either door could take the store's last super
- * administrator with it. Staff removal belongs in /admin/staff.
+ * CUSTOMER rows only, and that lives in the `WHERE` rather than at each call
+ * site. Three doors reach this — the detail-page button, the bulk bar, and the
+ * customer's own settings form — and a staff row leaving by any of them could
+ * take the store's last super administrator with it. Staff removal belongs in
+ * /admin/staff.
  *
- * Returns the deleted email for the audit entry, or null if it refused.
+ * Returns the emails actually deleted, for the audit entry. An id that names a
+ * staff account or nothing at all is simply absent from the result, so a caller
+ * that passes one id can treat an empty array as "refused".
  */
-export async function deleteCustomerAccount(id: string): Promise<{ email: string } | null> {
-  const row = await queryOne<{ email: string; role: string }>(
-    'SELECT "email", "role" FROM "User" WHERE "id" = $1',
-    [id],
+export async function deleteCustomerAccounts(ids: string[]): Promise<string[]> {
+  if (ids.length === 0) return []
+  const rows = await query<{ email: string }>(
+    `DELETE FROM "User" WHERE "id" = ANY($1::text[]) AND "role" = 'CUSTOMER' RETURNING "email"`,
+    [ids],
   )
-  if (!row || row.role !== 'CUSTOMER') return null
-  await query('DELETE FROM "User" WHERE "id" = $1', [id])
-  return { email: row.email }
+  return rows.map((row) => row.email)
 }
 
 /**

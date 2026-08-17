@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { db } from '@/lib/db'
-import { deleteCustomerAccount } from '@/lib/auth'
+import { deleteCustomerAccounts } from '@/lib/auth'
 import { auditData } from '@/lib/rbac'
 import { run } from '@/server/guard'
 import { toBool, toCents, toList, toStringOrNull, type ActionState } from '@/lib/form'
@@ -70,12 +70,12 @@ export async function deleteCustomer(_prev: ActionState, form: FormData): Promis
     if (admin.role !== 'SUPER_ADMIN') return { error: 'Only a super administrator can delete an account.' }
 
     const id = String(form.get('id'))
-    const deleted = await deleteCustomerAccount(id)
-    if (!deleted) return { error: 'Only customer accounts can be deleted here — staff go through Staff & roles.' }
+    const [email] = await deleteCustomerAccounts([id])
+    if (!email) return { error: 'Only customer accounts can be deleted here — staff go through Staff & roles.' }
 
-    await db.auditLog.create({ data: auditData(admin, 'customer.delete', id, { email: deleted.email }) })
+    await db.auditLog.create({ data: auditData(admin, 'customer.delete', id, { email }) })
     revalidatePath('/admin/customers')
-    return { ok: `Deleted ${deleted.email}` }
+    return { ok: `Deleted ${email}` }
   })
 
   // The detail page it was called from now 404s, so leave it.
@@ -88,6 +88,22 @@ export async function bulkCustomers(_prev: ActionState, form: FormData): Promise
     const ids = form.getAll('ids').map(String).filter(Boolean)
     const op = String(form.get('op') ?? '')
     if (ids.length === 0) return { error: 'Nothing selected' }
+
+    // Same super-administrator gate as the single delete, for the same reason:
+    // `customers.*` covers `customers.delete`, and this button reaches a whole
+    // page of accounts at once.
+    if (op === 'delete') {
+      if (admin.role !== 'SUPER_ADMIN') return { error: 'Only a super administrator can delete accounts.' }
+
+      const emails = await deleteCustomerAccounts(ids)
+      // Short of `ids` means some were staff rows the delete declined to touch.
+      const skipped = ids.length - emails.length
+      await db.auditLog.create({ data: auditData(admin, 'customer.bulk.delete', null, { emails }) })
+      revalidatePath('/admin/customers')
+      return {
+        ok: `Deleted ${emails.length} customers${skipped > 0 ? ` — ${skipped} skipped, not customer accounts` : ''}`,
+      }
+    }
 
     if (op === 'block' || op === 'unblock') {
       await db.user.updateMany({ where: { id: { in: ids } }, data: { status: op === 'block' ? 'BLOCKED' : 'ACTIVE' } })

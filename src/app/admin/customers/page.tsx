@@ -13,7 +13,7 @@ export const metadata = { title: 'Customers' }
 type Search = { q?: string; status?: string; segment?: string; page?: string }
 
 export default async function AdminCustomers({ searchParams }: { searchParams: Promise<Search> }) {
-  await requirePagePermission('customers.read')
+  const admin = await requirePagePermission('customers.read')
   const params = await searchParams
   const { page, skip, take } = paging(params.page)
   const mayWrite = await hasPermission('customers.write')
@@ -117,6 +117,17 @@ export default async function AdminCustomers({ searchParams }: { searchParams: P
                     Block
                   </BulkButton>
                   <BulkButton op="unblock">Unblock</BulkButton>
+                  {/* Super administrators only — "Select all on page" sits one
+                      click away, so this button can reach 25 accounts at once. */}
+                  {admin.role === 'SUPER_ADMIN' && (
+                    <BulkButton
+                      op="delete"
+                      variant="danger"
+                      confirm="Permanently delete the selected accounts, with their addresses, wishlists, and store credit? This cannot be undone."
+                    >
+                      Delete
+                    </BulkButton>
+                  )}
                 </>
               ) : (
                 <span className="text-xs text-[var(--admin-muted)]">Read-only access</span>
