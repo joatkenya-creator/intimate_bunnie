@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { query, queryOne } from '@/lib/sql'
 import { tokenSubject, verifyToken } from '@/lib/auth'
 import { pageMetadata } from '@/lib/seo'
+import { sendWelcome } from '@/services/email'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,16 +19,33 @@ async function confirm(token: string | undefined): Promise<boolean> {
 
   const claimed = tokenSubject(token)
   const user = claimed
-    ? await queryOne<{ id: string; email: string; emailVerifiedAt: Date | null }>(
-        'SELECT "id", "email", "emailVerifiedAt" FROM "User" WHERE "id" = $1',
+    ? await queryOne<{
+        id: string
+        email: string
+        name: string | null
+        role: string
+        createdAt: Date
+        emailVerifiedAt: Date | null
+      }>(
+        'SELECT "id", "email", "name", "role", "createdAt", "emailVerifiedAt" FROM "User" WHERE "id" = $1',
         [claimed],
       )
     : null
   // Bound to the address: a link mailed to the old address cannot confirm a new one.
   if (!user || !(await verifyToken('verify-email', token, user.email))) return false
 
+  // Only on the first confirmation. The link stays valid for three days, and
+  // mail clients pre-fetch — without this guard a scanner or a second click
+  // would send the welcome again. The send cannot throw, so a mail outage
+  // still leaves the address confirmed.
   if (!user.emailVerifiedAt) {
     await query('UPDATE "User" SET "emailVerifiedAt" = now() WHERE "id" = $1', [user.id])
+    await sendWelcome({
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      createdAt: new Date(user.createdAt),
+    })
   }
   return true
 }

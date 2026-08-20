@@ -7,6 +7,7 @@ import { query } from '@/lib/sql'
 import { formatUSD } from '@/lib/money'
 import { pageMetadata } from '@/lib/seo'
 import { isStaffRole } from '@/lib/permissions'
+import { RegisteredNotice } from '@/components/account/RegisteredNotice'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,7 +18,8 @@ export const metadata: Metadata = pageMetadata({
   noindex: true,
 })
 
-export default async function AccountPage() {
+export default async function AccountPage({ searchParams }: { searchParams: Promise<{ registered?: string }> }) {
+  const justRegistered = (await searchParams).registered === '1'
   const user = await currentUser().catch(() => null)
   if (!user) redirect('/account/login')
 
@@ -29,6 +31,7 @@ export default async function AccountPage() {
 
   return (
     <div className="container-ib max-w-3xl py-14">
+      {justRegistered && <RegisteredNotice />}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="eyebrow">Your account</p>

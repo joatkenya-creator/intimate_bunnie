@@ -17,7 +17,7 @@ import { absoluteUrl } from '@/config/site'
 import { rateLimit, clientIp } from '@/lib/security'
 import { checkBotId } from 'botid/server'
 import { newId } from '@/lib/ids'
-import { sendPasswordChanged, sendPasswordReset, sendVerifyEmail, sendWelcome } from '@/services/email'
+import { sendPasswordChanged, sendPasswordReset, sendVerifyEmail } from '@/services/email'
 
 export type AuthState = { error?: string; sent?: boolean }
 
@@ -56,19 +56,21 @@ export async function register(_prev: AuthState, formData: FormData): Promise<Au
     return { error: 'An account with that email already exists' }
   }
 
-  const user = (await queryOne<{ id: string; role: string; createdAt: Date }>(
-    'INSERT INTO "User" ("id", "email", "name", "passwordHash") VALUES ($1,$2,$3,$4) RETURNING "id", "role", "createdAt"',
+  const user = (await queryOne<{ id: string }>(
+    'INSERT INTO "User" ("id", "email", "name", "passwordHash") VALUES ($1,$2,$3,$4) RETURNING "id"',
     [newId(), email, parsed.data.name ?? null, await hashPassword(parsed.data.password)],
   ))!
 
   // Bound to the address itself, so a link mailed to an old address cannot
-  // verify a new one. Neither send can throw; both run before the redirect.
+  // verify a new one. The send cannot throw, and runs before the redirect so the
+  // confirmation is already on its way by the time the notice tells them to look.
+  // The welcome email is not sent here — it waits for the confirmation click,
+  // in src/app/account/verify/page.tsx.
   const token = await signToken('verify-email', user.id, VERIFY_TTL_HOURS * 3600, email)
-  await sendWelcome({ name: parsed.data.name, email, role: user.role, createdAt: new Date(user.createdAt) })
   await sendVerifyEmail(email, absoluteUrl(`/account/verify?token=${token}`), VERIFY_TTL_HOURS)
 
   await createSession(user.id)
-  redirect('/account')
+  redirect('/account?registered=1')
 }
 
 export async function requestPasswordReset(_prev: AuthState, formData: FormData): Promise<AuthState> {

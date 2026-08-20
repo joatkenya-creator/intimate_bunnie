@@ -20,8 +20,8 @@ third row needs an SMTP relay rather than being a Cloudflare setting.
 
 | Email                | Trigger                                    | Wired |
 | -------------------- | ------------------------------------------ | ----- |
-| Welcome              | `register()` succeeds                       | ✅ |
-| Verify email         | `register()` succeeds — link to `/account/verify`, 72 h | ✅ |
+| Verify email         | `register()` succeeds — link to `/account/verify`, 72 h. The only email a signup triggers. Also on an email change, and on `resendVerification()` from `/account/settings` (3/hour) | ✅ |
+| Welcome              | the confirmation link is clicked for the first time, in `/account/verify` | ✅ |
 | Password reset       | `requestPasswordReset()` — link to `/account/reset`, 60 min | ✅ |
 | Password changed     | `resetPassword()` succeeds                  | ✅ |
 | Order confirmation   | `placeOrder()` after the transaction commits | ✅ |
@@ -150,8 +150,10 @@ curl -X POST https://api.resend.com/emails \
   land in `yowens@yoassoc.com` within seconds.
 - **Alignment:** send one to a Gmail address, open **Show original**, and confirm
   `SPF: PASS`, `DKIM: PASS`, `DMARC: PASS`.
-- **End to end:** register a test account on the live site and confirm the welcome
-  and verification emails arrive and the verification link works.
+- **End to end:** register a test account on the live site. Only the verification
+  email should arrive, and the browser should land on `/account` showing the
+  "Account created!" notice. Clicking the link confirms the address and *then*
+  sends the welcome email; clicking it a second time must not send another.
 
 ## 6. Notes
 

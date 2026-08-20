@@ -88,3 +88,34 @@ test('the welcome email renders the account details, and drops rows it has no va
   assert.ok(withOrg.html.includes('Welcome, Ada!'))
   assert.ok(withOrg.text.includes('Membership: VIP'), 'the plain-text twin carries the same rows')
 })
+
+test('the welcome email is painted from the same palette as the confirmation email', () => {
+  // The two now arrive at different moments in one flow, so they have to look
+  // like a pair. Any colour that is not a brand token is a leftover.
+  const brand = new Set([
+    '#ffffff',
+    '#fffaf7', // cream
+    '#fff4ee', // peach-50
+    '#ffe7db', // peach-100
+    '#ffd4c0', // peach-200
+    '#fce4ec', // rose-50
+    '#f9c8d9', // rose-100
+    '#e91e63', // rose-500
+    '#9d0f3d', // rose-700
+    '#2b1a22', // plum-900
+    '#4b323d', // plum-700
+    '#7a6069', // plum-500
+    '#a6919a', // plum-300
+    '#f0ddd4', // line
+  ])
+
+  const mail = welcome({ email: 'ada@example.com', role: 'CUSTOMER', createdAt: new Date('2026-08-11T09:00:00Z') })
+  for (const hex of mail.html.match(/(?<!&)#[0-9a-fA-F]{3,8}\b/g) ?? []) {
+    assert.ok(brand.has(hex.toLowerCase()), `${hex} in the welcome email is not a brand colour`)
+  }
+
+  const confirm = verifyEmail({ url: 'https://intimatebunnie.com/account/verify?token=t', expiresInHours: 72 })
+  for (const hex of confirm.html.match(/(?<!&)#[0-9a-fA-F]{3,8}\b/g) ?? []) {
+    assert.ok(brand.has(hex.toLowerCase()), `${hex} in the confirmation email is not a brand colour`)
+  }
+})

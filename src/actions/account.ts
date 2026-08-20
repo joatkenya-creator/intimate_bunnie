@@ -79,6 +79,44 @@ export async function updateProfile(_prev: ProfileState, formData: FormData): Pr
   return { saved: true }
 }
 
+/**
+ * Resend the confirmation link to the address already on file. The signup mail
+ * is the only thing that confirms an address, and the welcome email waits
+ * behind it — so a lost confirmation used to strand the account for good.
+ * Changing the email in the form re-sends as a side effect, but re-saving the
+ * same address is a deliberate no-op, so that was never a way out.
+ */
+export async function resendVerification(): Promise<void> {
+  let user
+  try {
+    user = await requireUser()
+  } catch {
+    redirect('/account/login')
+  }
+
+  const row = await queryOne<{ emailVerifiedAt: Date | null }>(
+    'SELECT "emailVerifiedAt" FROM "User" WHERE "id" = $1',
+    [user.id],
+  )
+  // Already confirmed — mailing a live link to a verified address is noise, and
+  // a token nobody asked for.
+  if (row?.emailVerifiedAt) redirect('/account/settings')
+
+  // Keyed by account: the button can only ever mail the account's own address,
+  // so the blast radius is one inbox. Three an hour covers a genuinely lost
+  // email without turning the page into a self-service mail bomb.
+  if (rateLimit(`verify-mail:${user.id}`, 3, 60 * 60_000)) {
+    // Bound to the address, exactly as at signup: a link mailed to an old
+    // address must not confirm a new one.
+    const token = await signToken('verify-email', user.id, VERIFY_TTL_HOURS * 3600, user.email)
+    await sendVerifyEmail(user.email, absoluteUrl(`/account/verify?token=${token}`), VERIFY_TTL_HOURS)
+  }
+
+  // The same answer over the limit as under it. A distinguishable one would
+  // report how much mail has already been sent.
+  redirect('/account/settings?resent=1')
+}
+
 export type DeleteState = { error?: string }
 
 /**

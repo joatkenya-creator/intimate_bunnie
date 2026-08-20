@@ -144,9 +144,9 @@ export function welcome(user: WelcomeUser): Mail {
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: 'Georgia', 'Times New Roman', serif;
-      background: #f0ede8;
+      background: #fffaf7;
       padding: 40px 16px;
-      color: #2d2d2d;
+      color: #4b323d;
     }
     .wrapper {
       max-width: 600px;
@@ -157,20 +157,20 @@ export function welcome(user: WelcomeUser): Mail {
       box-shadow: 0 4px 24px rgba(0,0,0,0.10);
     }
     .header {
-      background: linear-gradient(135deg, #1a3a2a 0%, #2d6a4f 100%);
-      background-color: #2d6a4f;
+      background: linear-gradient(135deg, #2b1a22 0%, #9d0f3d 100%);
+      background-color: #9d0f3d;
       padding: 48px 40px 36px;
       text-align: center;
     }
     .header .icon { font-size: 40px; display: block; margin-bottom: 12px; }
     .header h1 {
-      color: #e8d5a3;
+      color: #ffd4c0;
       font-size: 28px;
       font-weight: normal;
       letter-spacing: 2px;
     }
     .header .subtitle {
-      color: #95c4a8;
+      color: #f9c8d9;
       font-size: 12px;
       letter-spacing: 4px;
       text-transform: uppercase;
@@ -179,7 +179,7 @@ export function welcome(user: WelcomeUser): Mail {
     .header .rule {
       width: 60px;
       height: 3px;
-      background: #e8d5a3;
+      background: #ffd4c0;
       margin: 20px auto 0;
       border-radius: 2px;
       font-size: 0;
@@ -187,20 +187,20 @@ export function welcome(user: WelcomeUser): Mail {
     }
     .body { padding: 44px 40px; }
     .body h2 {
-      color: #1a3a2a;
+      color: #2b1a22;
       font-size: 24px;
       font-weight: normal;
       margin-bottom: 16px;
     }
     .body p {
-      color: #555;
+      color: #4b323d;
       line-height: 1.8;
       font-size: 15px;
       margin-bottom: 16px;
     }
     .detail-card {
-      background: #f7f9f8;
-      border: 1px solid #d4e8dc;
+      background: #fff4ee;
+      border: 1px solid #ffe7db;
       border-radius: 8px;
       padding: 24px 28px;
       margin: 28px 0;
@@ -209,18 +209,18 @@ export function welcome(user: WelcomeUser): Mail {
       font-size: 11px;
       text-transform: uppercase;
       letter-spacing: 3px;
-      color: #2d6a4f;
+      color: #9d0f3d;
       margin-bottom: 16px;
     }
     .detail-table { width: 100%; border-collapse: collapse; font-size: 14px; }
     .detail-table td {
       padding: 10px 0;
-      border-bottom: 1px solid #e4ede8;
+      border-bottom: 1px solid #f0ddd4;
     }
     .detail-table tr:last-child td { border-bottom: none; }
-    .detail-table .label { color: #888; text-align: left; }
+    .detail-table .label { color: #7a6069; text-align: left; }
     .detail-table .value {
-      color: #1a3a2a;
+      color: #2b1a22;
       font-weight: bold;
       text-align: right;
     }
@@ -229,20 +229,20 @@ export function welcome(user: WelcomeUser): Mail {
       padding: 3px 10px;
       border-radius: 20px;
       font-size: 12px;
-      background: #e8f5ee;
-      color: #2d6a4f;
-      border: 1px solid #b7ddc8;
+      background: #fce4ec;
+      color: #9d0f3d;
+      border: 1px solid #f9c8d9;
     }
-    .divider { width: 100%; height: 1px; background: #e8ede9; margin: 28px 0; }
+    .divider { width: 100%; height: 1px; background: #f0ddd4; margin: 28px 0; }
     .footer {
-      background: #f7f9f8;
-      border-top: 1px solid #e4ede8;
+      background: #fff4ee;
+      border-top: 1px solid #f0ddd4;
       padding: 28px 40px;
       text-align: center;
     }
-    .footer p { color: #999; font-size: 12px; line-height: 1.7; }
+    .footer p { color: #7a6069; font-size: 12px; line-height: 1.7; }
     .footer .brand {
-      color: #2d6a4f;
+      color: #9d0f3d;
       font-size: 14px;
       font-weight: bold;
       margin-bottom: 8px;
@@ -288,7 +288,7 @@ ${rows
       <div class="divider"></div>
 
       <p>Take your time looking around — we are here whenever you have a question, and we answer plainly.</p>
-      <p style="margin-top: 32px; color: #1a3a2a;">
+      <p style="margin-top: 32px; color: #2b1a22;">
         Warm regards,<br>
         <strong>The ${esc(site.name)} Team</strong>
       </p>

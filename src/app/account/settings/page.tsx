@@ -5,6 +5,7 @@ import { currentUser } from '@/lib/auth'
 import { queryOne } from '@/lib/sql'
 import { ProfileForm } from '@/components/account/ProfileForm'
 import { DeleteAccountForm } from '@/components/account/DeleteAccountForm'
+import { resendVerification } from '@/actions/account'
 import { pageMetadata } from '@/lib/seo'
 
 export const dynamic = 'force-dynamic'
@@ -16,7 +17,8 @@ export const metadata: Metadata = pageMetadata({
   noindex: true,
 })
 
-export default async function SettingsPage() {
+export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ resent?: string }> }) {
+  const resent = (await searchParams).resent === '1'
   const user = await currentUser().catch(() => null)
   if (!user) redirect('/account/login')
 
@@ -32,9 +34,20 @@ export default async function SettingsPage() {
       <h1 className="mt-2 text-3xl">Your details</h1>
 
       {!emailVerifiedAt && (
-        <p className="mt-6 border border-line bg-peach-50 px-4 py-3 text-sm">
-          Your email is not confirmed yet. Check your inbox for the link we sent when you signed up.
-        </p>
+        <div role="status" className="mt-6 border border-line bg-peach-50 px-4 py-3 text-sm">
+          <p>Your email is not confirmed yet. Check your inbox for the link we sent when you signed up.</p>
+          {resent ? (
+            <p className="mt-2 text-plum-500">
+              On its way. It can take a minute to arrive — check your spam folder too.
+            </p>
+          ) : (
+            <form action={resendVerification} className="mt-2">
+              <button type="submit" className="link-underline text-plum-900">
+                Send the link again
+              </button>
+            </form>
+          )}
+        </div>
       )}
 
       <ProfileForm name={user.name} email={user.email} />
