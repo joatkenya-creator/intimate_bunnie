@@ -4,7 +4,7 @@ import { BunnieMark } from '@/components/ui/icons'
 export default function NotFound() {
   return (
     <div className="container-ib flex flex-col items-center py-28 text-center">
-      <BunnieMark className="h-10 w-10 text-peach-300" />
+      <BunnieMark className="h-14 w-14" />
       <p className="eyebrow mt-6">404</p>
       <h1 className="mt-2 text-3xl">We can&apos;t find that page</h1>
       <p className="mt-3 max-w-sm text-sm text-plum-500">

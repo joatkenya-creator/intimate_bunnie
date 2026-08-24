@@ -35,9 +35,9 @@ export function NavBar({ categories, signedIn }: { categories: NavCategory[]; si
           <MenuIcon className="h-6 w-6" />
         </button>
 
-        <Link href="/" className="flex items-center gap-2 lg:w-56" aria-label="Intimate Bunnie home">
-          <BunnieMark className="h-7 w-7 text-rose-500" />
-          <span className="font-display text-xl tracking-tight lg:text-2xl">
+        <Link href="/" className="flex shrink-0 items-center gap-2 lg:min-w-56" aria-label="Intimate Bunnie home">
+          <BunnieMark className="h-11 w-11 lg:h-14 lg:w-14" />
+          <span className="font-display whitespace-nowrap text-2xl tracking-tight lg:text-3xl">
             Intimate <span className="text-rose-500">Bunnie</span>
           </span>
         </Link>

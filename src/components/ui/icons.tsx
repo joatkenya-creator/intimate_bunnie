@@ -1,3 +1,5 @@
+import Image from 'next/image'
+
 // Hand-rolled SVGs. An icon library would ship hundreds of unused paths.
 type IconProps = { className?: string }
 
@@ -62,10 +64,14 @@ export const ChevronIcon = ({ className }: IconProps) => (
   </svg>
 )
 
-/** The mark: a bunny silhouette drawn as two ears over a rounded head. */
+/** The mark: the Intimate Bunnie logo. */
 export const BunnieMark = ({ className }: IconProps) => (
-  <svg viewBox="0 0 32 32" className={className} fill="currentColor" aria-hidden>
-    <path d="M11.4 3.2c1.1 0 1.9 1 2.1 2.3l.9 6.1a7.6 7.6 0 0 0-2.7.6L9.5 6.1c-.5-1.4.3-2.9 1.9-2.9Zm9.2 0c1.6 0 2.4 1.5 1.9 2.9l-2.2 6.1a7.6 7.6 0 0 0-2.7-.6l.9-6.1c.2-1.3 1-2.3 2.1-2.3Z" />
-    <path d="M16 12.6c4.6 0 8.3 3.5 8.3 7.9 0 4.3-3.7 7.8-8.3 7.8s-8.3-3.5-8.3-7.8c0-4.4 3.7-7.9 8.3-7.9Z" />
-  </svg>
+  <Image
+    src="/logo-mark.png"
+    alt=""
+    width={96}
+    height={96}
+    priority
+    className={`rounded-lg object-cover ${className ?? ''}`}
+  />
 )

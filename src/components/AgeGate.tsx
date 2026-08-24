@@ -26,7 +26,7 @@ export function AgeGate() {
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-plum-900/80 px-5" role="dialog" aria-modal="true" aria-labelledby="age-gate-title">
       <div className="w-full max-w-md bg-cream px-7 py-9 text-center">
-        <BunnieMark className="mx-auto h-9 w-9 text-rose-500" />
+        <BunnieMark className="mx-auto h-12 w-12" />
         <h1 id="age-gate-title" className="mt-4 text-2xl">
           Are you 18 or older?
         </h1>

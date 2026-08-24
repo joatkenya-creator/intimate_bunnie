@@ -40,7 +40,7 @@ export function Footer() {
       <div className="container-ib grid gap-10 py-14 md:grid-cols-[1.4fr_repeat(3,1fr)]">
         <div className="max-w-xs">
           <div className="flex items-center gap-2">
-            <BunnieMark className="h-6 w-6 text-rose-500" />
+            <BunnieMark className="h-9 w-9" />
             <span className="font-display text-lg">Intimate Bunnie</span>
           </div>
           <p className="mt-3 text-sm leading-relaxed text-plum-500">{site.description}</p>
