@@ -48,8 +48,8 @@ export default async function HomePage() {
             <div className="aspect-[4/5] overflow-hidden bg-shell lg:aspect-[5/6]">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={imageUrl('https://picsum.photos/seed/ib-hero/1000/1200', { width: 1000 })}
-                alt="Blush silk and lace intimates styled on a peach backdrop"
+                src="/hero.webp"
+                alt="Black silk robe and lace lingerie styled on a rose-lit bed"
                 width={1000}
                 height={1200}
                 fetchPriority="high"
