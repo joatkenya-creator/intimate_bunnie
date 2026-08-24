@@ -19,15 +19,30 @@ export default async function HomePage() {
 
   return (
     <>
-      {/* Hero — editorial split, no full-bleed gradient. */}
-      <section className="border-b border-line bg-peach-50">
-        <div className="container-ib grid items-center gap-10 py-14 lg:grid-cols-2 lg:py-24">
-          <div className="max-w-xl">
-            <p className="eyebrow">New season · Intimates</p>
-            <h1 className="mt-3 text-4xl leading-[1.1] lg:text-6xl">
-              Pleasure, <em className="not-italic text-rose-500">beautifully</em> considered.
+      {/* Hero — the full landscape shot, uncropped, with the copy over its dark
+          left side. Below lg the copy drops under the image so nothing has to
+          shrink to stay readable. */}
+      <section className="relative border-b border-line bg-plum-900">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/hero.webp"
+          alt="Black silk robe and lace lingerie styled on a rose-lit bed"
+          width={1672}
+          height={941}
+          fetchPriority="high"
+          className="w-full"
+        />
+        <div
+          aria-hidden
+          className="hidden lg:absolute lg:inset-0 lg:block lg:bg-gradient-to-r lg:from-black/85 lg:via-black/60 lg:to-transparent"
+        />
+        <div className="container-ib py-12 lg:absolute lg:inset-0 lg:flex lg:items-center lg:py-0">
+          <div className="max-w-xl text-cream">
+            <p className="eyebrow text-rose-300">New season · Intimates</p>
+            <h1 className="mt-3 text-4xl leading-[1.1] text-cream lg:text-6xl">
+              Pleasure, <em className="not-italic text-rose-300">beautifully</em> considered.
             </h1>
-            <p className="mt-5 text-base leading-relaxed text-plum-700 lg:text-lg">
+            <p className="mt-5 text-base leading-relaxed text-cream/85 lg:text-lg">
               Sheer lace, rose-petal vibrators, warm body oils, and jewelry that catches the light. Chosen for women who
               know exactly what they like.
             </p>
@@ -35,31 +50,16 @@ export default async function HomePage() {
               <Link href="/shop" className="btn btn-primary">
                 Shop the collection
               </Link>
-              <Link href="/shop/lingerie" className="btn btn-outline">
+              <Link
+                href="/shop/lingerie"
+                className="btn border-cream text-cream hover:bg-cream hover:text-plum-900"
+              >
                 Lingerie &amp; thongs
               </Link>
             </div>
-            <p className="mt-6 text-xs uppercase tracking-[0.12em] text-plum-500">
+            <p className="mt-6 text-xs uppercase tracking-[0.12em] text-cream/70">
               Free discreet U.S. shipping over $59
             </p>
-          </div>
-
-          <div className="relative">
-            <div className="aspect-[4/5] overflow-hidden bg-shell lg:aspect-[5/6]">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/hero.webp"
-                alt="Black silk robe and lace lingerie styled on a rose-lit bed"
-                width={1000}
-                height={1200}
-                fetchPriority="high"
-                className="h-full w-full object-cover"
-              />
-            </div>
-            <div className="absolute -bottom-5 left-0 hidden bg-cream px-6 py-4 lg:block">
-              <p className="font-display text-2xl text-rose-500">4.8★</p>
-              <p className="text-xs text-plum-500">from 2,100+ verified reviews</p>
-            </div>
           </div>
         </div>
       </section>
