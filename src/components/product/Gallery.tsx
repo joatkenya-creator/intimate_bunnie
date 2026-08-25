@@ -1,9 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { imageUrl, PLACEHOLDER_IMAGE } from '@/services/media'
+import { imageUrl, imageSrcSet, PLACEHOLDER_IMAGE } from '@/services/media'
 
 type Media = { url: string; altText: string; width?: number | null; height?: number | null }
+
+// Full width on phones, roughly half the container from `lg` where the gallery
+// sits beside the buy box.
+const MAIN_SIZES = '(min-width: 1024px) 45vw, 100vw'
+const MAIN_WIDTHS = [640, 828, 1080]
 
 export function Gallery({ media, productName }: { media: Media[]; productName: string }) {
   const [active, setActive] = useState(0)
@@ -12,13 +17,13 @@ export function Gallery({ media, productName }: { media: Media[]; productName: s
   return (
     <div className="flex flex-col-reverse gap-4 lg:flex-row">
       {media.length > 1 && (
-        <ul className="flex gap-3 lg:flex-col" role="tablist" aria-label={`${productName} images`}>
+        <ul className="flex gap-3 lg:flex-col" aria-label={`${productName} images`}>
           {media.map((item, i) => (
             <li key={item.url}>
               <button
-                role="tab"
-                aria-selected={i === active}
-                aria-label={`View image ${i + 1} of ${media.length}`}
+                type="button"
+                aria-current={i === active ? 'true' : undefined}
+                aria-label={`Show image ${i + 1} of ${media.length}`}
                 onClick={() => setActive(i)}
                 className={`block h-20 w-16 overflow-hidden border transition-colors ${
                   i === active ? 'border-plum-900' : 'border-transparent hover:border-peach-300'
@@ -42,11 +47,15 @@ export function Gallery({ media, productName }: { media: Media[]; productName: s
       <div className="flex-1 bg-shell">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={current ? imageUrl(current.url, { width: 1000 }) : PLACEHOLDER_IMAGE}
+          key={current?.url}
+          src={current ? imageUrl(current.url, { width: 1080 }) : PLACEHOLDER_IMAGE}
+          srcSet={current ? imageSrcSet(current.url, MAIN_WIDTHS) : undefined}
+          sizes={current ? MAIN_SIZES : undefined}
           alt={current?.altText || productName}
           width={current?.width ?? 1000}
           height={current?.height ?? 1250}
           fetchPriority="high"
+          decoding="async"
           className="aspect-[4/5] w-full object-cover"
         />
       </div>

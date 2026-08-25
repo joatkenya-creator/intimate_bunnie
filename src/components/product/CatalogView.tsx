@@ -34,6 +34,16 @@ export function parseFilters(params: SearchParamsRecord): CatalogFilters {
   }
 }
 
+/**
+ * The canonical path for a listing. Filters and sorts are views of the same set
+ * and all canonicalise to the unfiltered page; pages 2+ canonicalise to
+ * themselves, because the products on them exist nowhere else in the crawl.
+ */
+export function canonicalPath(basePath: string, params: SearchParamsRecord): string {
+  const page = parseFilters(params).page ?? 1
+  return page > 1 ? `${basePath}?page=${page}` : basePath
+}
+
 /** Builds a href with patched params; nulls remove a key and reset paging. */
 function href(basePath: string, params: SearchParamsRecord, patch: Record<string, string | null>) {
   const next = new URLSearchParams()

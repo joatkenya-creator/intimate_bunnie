@@ -1,20 +1,43 @@
-// Media boundary. Today images are remote URLs served as-is; Cloudinary will
-// implement transform() later without any page needing to change.
+// Media boundary. Product imagery lives on remote hosts; every URL that reaches
+// a page goes through imageUrl() so the platform's own optimiser can resize it
+// and negotiate AVIF/WebP. Nothing bundles image bytes into the deployment.
 
 export type ImageTransform = { width?: number; height?: number; quality?: number }
 
-export interface ImageStorageProvider {
-  readonly id: string
-  transform(url: string, options: ImageTransform): string
+// The only widths Next's optimiser will serve — the union of `deviceSizes` and
+// `imageSizes`. A width outside this set is rejected with a 400, so requested
+// widths snap up to the next allowed one rather than being passed through.
+const ALLOWED_WIDTHS = [16, 32, 48, 64, 96, 128, 256, 384, 640, 750, 828, 1080, 1200, 1920, 2048, 3840]
+
+function snapWidth(width: number): number {
+  return ALLOWED_WIDTHS.find((w) => w >= width) ?? ALLOWED_WIDTHS[ALLOWED_WIDTHS.length - 1]
 }
 
-const passthrough: ImageStorageProvider = {
-  id: 'remote',
-  transform: (url) => url,
+/** Data URIs and already-optimised URLs must not be re-proxied. */
+function optimisable(url: string): boolean {
+  return Boolean(url) && !url.startsWith('data:') && !url.startsWith('/_next/image')
 }
 
+/**
+ * A single optimised source. Without a width the URL is returned untouched —
+ * the optimiser needs a width, and guessing one would ship a larger file than
+ * the original on a small element.
+ */
 export function imageUrl(url: string, options: ImageTransform = {}): string {
-  return passthrough.transform(url, options)
+  if (!optimisable(url) || !options.width) return url
+  const q = Math.min(100, Math.max(1, Math.trunc(options.quality ?? 72)))
+  return `/_next/image?url=${encodeURIComponent(url)}&w=${snapWidth(options.width)}&q=${q}`
+}
+
+/**
+ * `srcset` for the same image at several widths, so a phone never downloads the
+ * desktop rendition. Returns undefined when the URL cannot be optimised, which
+ * is exactly when the attribute should be omitted.
+ */
+export function imageSrcSet(url: string, widths: number[], quality?: number): string | undefined {
+  if (!optimisable(url)) return undefined
+  const snapped = [...new Set(widths.map(snapWidth))].sort((a, b) => a - b)
+  return snapped.map((w) => `${imageUrl(url, { width: w, quality })} ${w}w`).join(', ')
 }
 
 export const PLACEHOLDER_IMAGE =

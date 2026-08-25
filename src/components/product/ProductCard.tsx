@@ -1,9 +1,14 @@
 import Link from 'next/link'
 import { formatUSD, percentOff } from '@/lib/money'
-import { imageUrl, PLACEHOLDER_IMAGE } from '@/services/media'
+import { imageUrl, imageSrcSet, PLACEHOLDER_IMAGE } from '@/services/media'
 import { StarIcon } from '@/components/ui/icons'
 import type { ProductCardData } from '@/server/catalog'
 import { WishlistButton } from './WishlistButton'
+
+// Two per row on phones, four from `lg`. Told to the browser so it picks a
+// rendition off `srcset` instead of assuming the image fills the viewport.
+const CARD_SIZES = '(min-width: 1024px) 25vw, 50vw'
+const CARD_WIDTHS = [256, 384, 640, 750]
 
 /**
  * Server component. The only client JS on a grid of 24 cards is the wishlist
@@ -21,6 +26,8 @@ export function ProductCard({ product, priority }: { product: ProductCardData; p
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={primary ? imageUrl(primary.url, { width: 640 }) : PLACEHOLDER_IMAGE}
+            srcSet={primary ? imageSrcSet(primary.url, CARD_WIDTHS) : undefined}
+            sizes={primary ? CARD_SIZES : undefined}
             alt=""
             width={640}
             height={800}
@@ -33,6 +40,8 @@ export function ProductCard({ product, priority }: { product: ProductCardData; p
             /* eslint-disable-next-line @next/next/no-img-element */
             <img
               src={imageUrl(secondary.url, { width: 640 })}
+              srcSet={imageSrcSet(secondary.url, CARD_WIDTHS)}
+              sizes={CARD_SIZES}
               alt=""
               width={640}
               height={800}

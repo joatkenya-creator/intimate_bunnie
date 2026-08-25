@@ -64,14 +64,22 @@ export const ChevronIcon = ({ className }: IconProps) => (
   </svg>
 )
 
-/** The mark: the Intimate Bunnie logo. */
-export const BunnieMark = ({ className }: IconProps) => (
+/**
+ * The mark: the Intimate Bunnie logo.
+ *
+ * `priority` is opt-in rather than always-on. It emits a preload, and the mark
+ * renders in the footer and on the 404 page too — three preloads for one 56px
+ * image, two of them below the fold, competing with the hero for the first
+ * connections of the page load.
+ */
+export const BunnieMark = ({ className, priority }: IconProps & { priority?: boolean }) => (
   <Image
     src="/logo-mark.png"
     alt=""
     width={96}
     height={96}
-    priority
+    priority={priority}
+    loading={priority ? undefined : 'lazy'}
     className={`rounded-lg object-cover ${className ?? ''}`}
   />
 )
