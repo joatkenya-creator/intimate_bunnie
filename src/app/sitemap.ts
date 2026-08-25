@@ -4,34 +4,48 @@ import { absoluteUrl } from '@/config/site'
 
 export const dynamic = 'force-dynamic'
 
+// The seven documents that exist as code in app/pages/[slug], whether or not a
+// CMS entry has been written for them.
+const STATIC_SLUGS = ['about', 'shipping', 'returns', 'care', 'faq', 'privacy', 'terms']
+
+const isNoindex = (robots: string | null) => Boolean(robots?.toLowerCase().includes('noindex'))
+
+type ContentRow = { slug: string; updatedAt: Date; robots: string | null }
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [categories, products, pages] = await Promise.all([
-    query<{ slug: string }>('SELECT "slug" FROM "Category" WHERE "visible" = true'),
+  // A sitemap that 500s is worse than a short one: Search Console records the
+  // fetch failure and backs off. The static entries below always exist, so a
+  // database blip degrades the file instead of breaking it.
+  const [categories, products, entries] = await Promise.all([
+    query<{ slug: string }>('SELECT "slug" FROM "Category" WHERE "visible" = true').catch(() => []),
     query<{ slug: string; updatedAt: Date }>(
       'SELECT "slug", "updatedAt" FROM "Product" WHERE "active" = true LIMIT 5000',
-    ),
-    // CMS pages that are not one of the static documents below.
-    query<{ slug: string; updatedAt: Date }>(
-      `SELECT "slug", "updatedAt" FROM "ContentEntry"
-       WHERE "type" IN ('PAGE', 'POLICY') AND "status" = 'PUBLISHED' AND "robots" IS NULL LIMIT 500`,
-    ),
+    ).catch(() => []),
+    query<ContentRow>(
+      `SELECT "slug", "updatedAt", "robots" FROM "ContentEntry"
+       WHERE "type" IN ('PAGE', 'POLICY') AND "status" = 'PUBLISHED' LIMIT 500`,
+    ).catch((): ContentRow[] => []),
   ])
 
-  const staticSlugs = ['about', 'shipping', 'returns', 'care', 'faq', 'privacy', 'terms']
+  // A CMS entry marked noindex overrides the static document of the same slug —
+  // listing it here while the page says noindex is a contradiction a crawler
+  // reports back as an error.
+  const suppressed = new Set(entries.filter((entry) => isNoindex(entry.robots)).map((entry) => entry.slug))
+  const managed = entries.filter((entry) => !isNoindex(entry.robots))
 
   return [
     { url: absoluteUrl('/'), changeFrequency: 'daily', priority: 1 },
     { url: absoluteUrl('/shop'), changeFrequency: 'daily', priority: 0.9 },
-    ...staticSlugs.map((slug) => ({
+    ...STATIC_SLUGS.filter((slug) => !suppressed.has(slug)).map((slug) => ({
       url: absoluteUrl(`/pages/${slug}`),
       changeFrequency: 'monthly' as const,
       priority: 0.3,
     })),
-    ...pages
-      .filter((page) => !staticSlugs.includes(page.slug))
-      .map((page) => ({
-        url: absoluteUrl(`/pages/${page.slug}`),
-        lastModified: page.updatedAt,
+    ...managed
+      .filter((entry) => !STATIC_SLUGS.includes(entry.slug))
+      .map((entry) => ({
+        url: absoluteUrl(`/pages/${entry.slug}`),
+        lastModified: entry.updatedAt,
         changeFrequency: 'monthly' as const,
         priority: 0.3,
       })),

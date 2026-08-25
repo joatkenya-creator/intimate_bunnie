@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { rateLimit, clientIp } from '@/lib/security'
+import { resolveRedirect } from '@/lib/redirects'
 import {
   SESSION_COOKIE,
   signSession,
@@ -9,9 +10,36 @@ import {
 } from '@/lib/session'
 
 // Middleware is the only place that sees every request before routing, so it
-// carries the four things that must not be per-page opt-ins: the pathname the
-// root layout needs, admin rate limiting, managed redirects, and keeping an
-// active admin session alive.
+// carries the things that must not be per-page opt-ins: the pathname the root
+// layout needs, admin rate limiting, managed redirects, bouncing signed-out
+// visitors off private pages, and keeping an active admin session alive.
+
+// The account pages a signed-out visitor is supposed to reach. Everything else
+// under /account is personal.
+const PUBLIC_ACCOUNT_PATHS = ['/account/login', '/account/register', '/account/forgot', '/account/reset', '/account/verify']
+
+/**
+ * `redirect()` inside a streamed Server Component cannot set a status: by the
+ * time it throws, the shell has been flushed, so Next falls back to a
+ * `<meta http-equiv="refresh" content="1;url=…">` — a 200 response, a blank
+ * second of screen, and a redirect assistive technology has no way to announce.
+ *
+ * Bouncing here instead makes it a real 307 before any rendering happens, and
+ * saves the session lookup and layout render that were being thrown away.
+ *
+ * This is a bounce, not authorisation. Every page behind it still resolves the
+ * session server-side; a forged cookie gets past this and no further.
+ */
+function needsSession(pathname: string): boolean {
+  if (!pathname.startsWith('/account')) return false
+  return !PUBLIC_ACCOUNT_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`))
+}
+
+function toLogin(request: NextRequest, pathname: string) {
+  const login = new URL('/account/login', request.url)
+  login.searchParams.set('next', pathname)
+  return NextResponse.redirect(login)
+}
 
 const REDIRECT_TTL_MS = 60_000
 
@@ -25,7 +53,7 @@ let redirectCache: { at: number; map: Record<string, { destination: string; stat
  * database client. One cached fetch per isolate per minute keeps the hot path
  * free of a query while still letting an editor add a redirect without a deploy.
  */
-async function redirectFor(request: NextRequest, pathname: string) {
+async function redirectMap(request: NextRequest) {
   if (Date.now() - redirectCache.at > REDIRECT_TTL_MS) {
     try {
       const response = await fetch(new URL('/api/redirects', request.nextUrl.origin), {
@@ -38,7 +66,7 @@ async function redirectFor(request: NextRequest, pathname: string) {
       redirectCache = { ...redirectCache, at: Date.now() }
     }
   }
-  return redirectCache.map[pathname]
+  return redirectCache.map
 }
 
 /**
@@ -79,15 +107,17 @@ export async function middleware(request: NextRequest) {
 
     // Cheap bounce before rendering. Authorization itself still happens on the
     // server in the admin layout — this only saves the work, it is not the gate.
-    if (pathname.startsWith('/admin') && !request.cookies.has(SESSION_COOKIE)) {
-      const login = new URL('/account/login', request.url)
-      login.searchParams.set('next', pathname)
-      return NextResponse.redirect(login)
-    }
+    if (pathname.startsWith('/admin') && !request.cookies.has(SESSION_COOKIE)) return toLogin(request, pathname)
   } else {
-    const hit = await redirectFor(request, pathname)
+    if (needsSession(pathname) && !request.cookies.has(SESSION_COOKIE)) return toLogin(request, pathname)
+
+    const hit = resolveRedirect(await redirectMap(request), pathname)
     if (hit) {
-      return NextResponse.redirect(new URL(hit.destination, request.url), hit.statusCode === 302 ? 307 : 308)
+      const target = new URL(hit.destination, request.url)
+      // A destination that carries no query of its own inherits the request's,
+      // so a redirect never drops the campaign parameters that paid for it.
+      if (!target.search) target.search = request.nextUrl.search
+      return NextResponse.redirect(target, hit.statusCode === 302 ? 307 : 308)
     }
   }
 
