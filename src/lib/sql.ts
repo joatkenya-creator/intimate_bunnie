@@ -1,14 +1,15 @@
 import 'server-only'
 import { neon } from '@neondatabase/serverless'
 
-// Postgres over Neon's HTTP endpoint. One `fetch` per query, no WebSocket, and
-// crucially **no WASM**.
+// Postgres over Neon's HTTP endpoint. One `fetch` per query, no connection to
+// pool, no engine to instantiate.
 //
-// That last point is the whole reason this file exists. Prisma's workerd client
-// ships a ~2 MB WASM engine, and instantiating it on a cold isolate blows the
-// free plan's 10 ms CPU budget — the Worker returns 503 before it ever reaches
-// the database. `wrangler tail` called it exactly: "Worker exceeded CPU time
-// limit" on every route that touched Prisma, and never on the ones that did not.
+// It was written under duress: on Cloudflare Workers, Prisma's ~2 MB WASM engine
+// could not be instantiated inside the free plan's 10 ms CPU budget, and every
+// route that touched it returned 503. The store has since moved to Vercel, where
+// that ceiling does not apply — but these paths stayed on SQL, because they are
+// the ones every visitor hits and this is the cheapest way to serve them. The
+// admin still uses Prisma, where a query builder earns its cost.
 //
 // The trade is real: no generated types, no query builder. Every query here is
 // SQL, and every value crosses as a bound parameter — never string interpolation.
@@ -19,8 +20,9 @@ function connection() {
   if (!client) {
     const url = process.env.DATABASE_URL
     if (!url) throw new Error('DATABASE_URL is not set')
-    // The HTTP client holds no socket, so one module-level instance is safe in
-    // workerd — unlike a pooled driver, which cannot cross request boundaries.
+    // The HTTP client holds no socket, so one module-level instance is safe to
+    // share — unlike a pooled driver, whose connections cannot be reused across
+    // requests in a serverless runtime.
     client = neon(url)
   }
   return client

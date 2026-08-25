@@ -2,8 +2,8 @@
 // `server-only`: the seed script runs under Node and needs to mint a hash, and
 // one shared implementation beats two that can drift apart on iteration count.
 //
-// Web Crypto is available in both Node and workerd, so there is no auth
-// dependency and no Node-only shim in the Worker.
+// Web Crypto rather than a hashing library: one less dependency on the path
+// every sign-in takes, and PBKDF2 is exactly what it provides.
 
 const PBKDF2_ITERATIONS = 100_000
 const enc = new TextEncoder()

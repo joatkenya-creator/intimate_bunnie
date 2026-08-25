@@ -148,11 +148,11 @@ admin could have its own root.
 follows from it. One definition, in `deriveActive()` — the catalog cannot
 disagree with the editor.
 
-**Scheduling needs no cron.** Middleware polls `/api/redirects` once a minute per
-isolate for the redirect map, and that request also runs `runDueTransitions()`,
-flipping scheduled products and posts to published. Point a Cloudflare cron
-trigger at `POST /api/admin/cron` (guarded by `CRON_SECRET`) when minute
-granularity or the low-stock sweep matters.
+**Scheduling mostly needs no cron.** Middleware polls `/api/redirects` once a
+minute per instance for the redirect map, and that request also runs
+`runDueTransitions()`, flipping scheduled products and posts to published. The
+cron entry in `vercel.json` calls `POST /api/admin/cron` (guarded by
+`CRON_SECRET`) for exact timing and the low-stock sweep.
 
 **One table for all editable copy.** `ContentEntry` carries a `type` — pages,
 policies, FAQs, announcements, banners, and blog posts differ by which fields
@@ -181,16 +181,14 @@ A real `.xlsx` writer is a 400 kB dependency for a file Excel already reads.
 
 ## Media uploads
 
-`services/media.ts` gained an upload boundary next to the existing transform one.
-`getMediaStorage()` returns an R2-backed provider when the Worker has a
-`MEDIA_BUCKET` binding and `MEDIA_PUBLIC_BASE` is set; otherwise it returns a
-provider that fails with a sentence an operator can act on. Until a bucket
-exists, "Add by URL" in the media picker is the working path.
+`services/media.ts` has an upload boundary next to the transform one.
+`getMediaStorage()` returns a Vercel Blob provider once a Blob store is connected
+to the project; without one it returns a provider that fails with a sentence an
+operator can act on, and "Add by URL" in the media picker stays the working path.
 
-```jsonc
-// wrangler.jsonc
-"r2_buckets": [{ "binding": "MEDIA_BUCKET", "bucket_name": "intimate-bunnie-media" }]
-```
+Detection gates on `BLOB_STORE_ID` **or** `BLOB_READ_WRITE_TOKEN`, because the
+integration injects either an OIDC pair or a static token — checking only one
+reads a connected store as unconfigured.
 
 Uploads are capped at 8 MB and restricted to JPEG, PNG, WebP, AVIF, GIF, and MP4.
 

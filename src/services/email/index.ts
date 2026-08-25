@@ -5,9 +5,9 @@ import type { OrderMail, WelcomeUser } from './templates'
 
 export * from './templates'
 
-// Email boundary. Delivery goes over Resend's HTTP API — plain fetch, which
-// workerd has natively. An SMTP client would need node:net, which the Worker
-// does not have, and an SDK would add a dependency for one POST.
+// Email boundary. Delivery goes over Resend's HTTP API — plain fetch. An SMTP
+// client would hold a socket open, which suits a serverless runtime badly, and
+// an SDK would add a dependency for one POST.
 //
 // Nothing here throws. A mail outage must never fail a registration or, worse,
 // a paid checkout: the order is already in the database by the time we send.
@@ -50,7 +50,7 @@ async function deliver(to: string, mail: t.Mail): Promise<boolean> {
     }
     return response.ok
     // ponytail: send is fire-and-forget with no retry. If a dropped receipt ever
-    // matters, put a Cloudflare Queue in front of deliver() rather than
+    // matters, put a queue in front of deliver() rather than
     // retrying inline — the request should not wait on the mail provider.
   } catch (error) {
     console.error(`[email] "${mail.subject}" to ${to} threw:`, error)

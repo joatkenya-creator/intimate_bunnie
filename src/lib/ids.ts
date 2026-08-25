@@ -1,6 +1,6 @@
 /**
  * Human-facing references: base32-ish, no vowels, so no reference ever spells a
- * word or gets misread over the phone. Web Crypto, available in Node and workerd.
+ * word or gets misread over the phone. Web Crypto, so no dependency.
  */
 export function reference(prefix: string): string {
   const alphabet = '23456789BCDFGHJKLMNPQRSTVWXZ'

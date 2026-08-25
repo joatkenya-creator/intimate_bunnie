@@ -1,86 +1,22 @@
 # Performance
 
-## Worker bundle budget
+## Server bundle
 
-| Band | gzip |
-| --- | --- |
-| Green | ≤ 2.0 MiB |
-| Warning | 2.0 – 2.5 MiB |
-| Fail | > 2.5 MiB |
-| Hard failure | ≥ 3.0 MiB |
+There is no hard bundle ceiling any more. On Cloudflare Workers the Worker had to
+fit under 3.0 MiB gzip, and it came within 7 KiB of that — most of it two copies
+of Prisma's WASM engine, one per Turbopack module layer. Vercel imposes no
+equivalent limit, so that budget, the `cf:size` check, and the whole
+deduplication hunt are gone.
 
-**Measured: 2879.52 KiB gzip** (12115.95 KiB raw) — over the 2.5 MiB target, with
-191 KiB under the 3.0 MiB hard ceiling. Watch it on every server-side change.
+Bundle size still matters for cold-start time, just not as a pass/fail gate. Two
+things keep it down and are worth preserving:
 
-Was 2993.23 KiB with 7 KiB of headroom until the client switched to
-`engineType = "client"`.
-
-Measure with `npm run cf:size` and read the `gzip` figure from `Total Upload`.
-That is the number Cloudflare enforces.
-
-### Where it went
-
-The 1256.46 KiB figure this file used to quote was measured at `6a8eb25`, when
-the schema had no `runtime = "workerd"` — before the WASM query engine existed in
-the build at all. `37cf3e9` introduced it to fix a production outage
-(`fs.readdir is not implemented` in workerd), and nobody re-measured.
-
-Splitting the number by where the bytes actually are:
-
-| | gzip |
-| --- | --- |
-| Prisma WASM, ×2 | 1459.8 KiB |
-| Everything else — Next runtime, React, app code | 1419.7 KiB |
-
-Against 1256.5 KiB total at `6a8eb25`, application code is a small share of the
-growth. **The increase is the WASM, not the storefront or the admin.**
-
-### What `engineType = "client"` changed
-
-The generator now emits `query_compiler_bg.wasm` (1904.6 KiB raw / 729.9 KiB
-gzip) instead of `query_engine_bg.wasm` (2243.8 KiB / 864.2 KiB): Prisma calls
-compile to SQL and go to the driver adapter, with no Rust query engine. It is not
-a preview feature — `queryCompiler` and `driverAdapters` are *deprecated as
-preview flags* in 6.19.3 because the functionality graduated.
-
-It saved 113.7 KiB gzip, less than 2 × 134.3 because the compiler path carries
-more JavaScript. It does **not** fix the duplication; it makes the duplicated
-thing smaller.
-
-### Why it is duplicated
-
-`src/generated/prisma/internal/class.ts` reaches it through a relative dynamic
-import:
-
-```ts
-const { default: module } = await import('./query_engine_bg.wasm?module')
-```
-
-Turbopack builds the RSC layer and the route-handler layer as separate module
-graphs, so each emits its own copy — `chunks/ssr/…wasm` and `chunks/…wasm`,
-byte-identical, same content hash. `serverExternalPackages` cannot help: it
-applies to node_modules packages, and this is generated into our own source tree.
-
-Confining Prisma to one layer would fix it, but four handlers genuinely need both
-a route handler and the database: `/api/redirects` (middleware fetches it),
-`/api/wishlist` (a `sendBeacon` target), `/api/admin/export` (needs
-`content-disposition`), and `/api/admin/cron` (called by an external scheduler).
-
-Switching to the query compiler shrank each copy but left the duplication in
-place. Removing it outright needs either Turbopack to share assets across module
-layers, or the WASM to be uploaded once as a Cloudflare module binding and
-instantiated at runtime instead of imported — which means patching generated
-code that `prisma generate` overwrites.
-
-Until then this is a watch item, not a solved one. `npm run cf:size` before any
-server-side change, and re-measure after every Prisma upgrade: a larger compiler
-would eat the remaining 191 KiB without a line of application code changing.
-
-### What is in it
-
-Roughly, largest first: the Next.js server runtime and React server renderer,
-the Prisma client and its query engine, `pg` with its `nodejs_compat` shims, the
-OpenNext adapter, then application code — which is a small share of the total.
+- The customer-facing paths do not load Prisma at all. They query Postgres over
+  Neon's HTTP endpoint (`src/lib/sql.ts`), so no ORM or engine is instantiated on
+  a request a visitor makes. The admin still uses Prisma, where a query builder
+  earns its cost.
+- `engineType = "client"` on both generators uses Prisma's query compiler rather
+  than the Rust query engine.
 
 ### Why it is small
 
@@ -149,9 +85,9 @@ each record type the caller has no permission to read.
 
 ## Rendering
 
-Database-backed routes are `force-dynamic` because the free-plan Worker has no
-KV binding to back ISR. Adding one and switching those routes to `revalidate` is
-the single largest remaining win, and it is a configuration change.
+Database-backed routes are `force-dynamic`. Switching the catalog pages to
+`revalidate` is the single largest remaining win and is now a per-route change —
+Vercel backs ISR out of the box, which the previous host could not.
 
 Static content routes are prerendered. `loading.tsx` provides a skeleton so
 navigation feels immediate.
@@ -162,10 +98,10 @@ Tailwind v4 with design tokens in `@theme`. One stylesheet, purged to what the
 markup uses. Animations are CSS transitions only, and all of them are disabled
 under `prefers-reduced-motion`.
 
-## If the bundle grows
+## If cold starts get slow
 
-1. `npm run cf:size` to confirm.
-2. Look at what changed in `.open-next/server-functions/default`.
-3. Usual causes: a dependency pulled into a client component, a server package
-   crossing a `'use client'` boundary, or a large JSON file imported into source.
-4. Fix the cause. Do not delete features to hit the number.
+1. Check the function duration in the Vercel dashboard, cold vs warm.
+2. Usual causes: a dependency pulled into a client component, a server package
+   crossing a `'use client'` boundary, a large JSON file imported into source, or
+   Prisma reaching a route a customer hits.
+3. Fix the cause. Do not delete features to hit a number.

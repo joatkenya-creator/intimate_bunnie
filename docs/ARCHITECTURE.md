@@ -98,10 +98,9 @@ cannot be imported into middleware.
 
 ## Rendering
 
-Routes that read the database are `force-dynamic`. The free-plan Worker has no
-KV binding, so OpenNext cannot back ISR; adding one is the single change needed
-to switch pages to `revalidate`. Static-content routes (`/pages/[slug]`) are
-prerendered via `generateStaticParams`.
+Routes that read the database are `force-dynamic`. Switching the catalog pages
+to `revalidate` is now just a per-route change — Vercel backs ISR out of the box,
+which the previous host could not on its free plan.
 
 The header reads `cookies()` before it queries, which opts routes into dynamic
 rendering before any database call — that is what keeps `next build` working
@@ -113,10 +112,10 @@ without a reachable database.
 | --- | --- | --- | --- |
 | `PaymentProvider` | `services/payment.ts` | dev provider, records intents | Klarna |
 | `ImageStorageProvider` | `services/media.ts` | passthrough remote URLs | Cloudinary (also where cropping lands) |
-| `MediaStorageProvider` | `services/media.ts` | R2 when bound, otherwise a clear failure | R2 or S3 |
+| `MediaStorageProvider` | `services/media.ts` | Vercel Blob when connected, otherwise a clear failure | S3 |
 | `ProductSource` | `services/import/normalize.ts` | CSV / JSON | Firecrawl, supplier APIs |
-| Rate limiting | `lib/security.ts` | per-isolate fixed window | Durable Object or Upstash |
-| Scheduling | `server/scheduler.ts` | piggybacked on the redirect poll | Cloudflare cron → `/api/admin/cron` |
+| Rate limiting | `lib/security.ts` | per-instance fixed window | Upstash or Vercel Firewall |
+| Scheduling | `server/scheduler.ts` | `vercel.json` cron, plus the redirect poll between runs | — |
 
 None of these packages are installed, and none of them are imported. Adding one
 is a second implementation of an existing interface, not a rewrite.

@@ -4,8 +4,8 @@ import { SETTINGS_DEFAULTS, type SettingsGroup, type SettingsGroups } from '@/co
 
 // Settings reads live here rather than in server/admin.ts because the storefront
 // header needs branding on every request. Importing the admin query layer would
-// drag Prisma into the public path, and the WASM engine cannot be instantiated
-// inside the free plan's CPU budget.
+// drag Prisma into the public path, which is deliberately kept free of it — see
+// lib/sql.ts.
 
 /** Stored values merged over the defaults, so a new field never reads undefined. */
 export async function getSettings<G extends SettingsGroup>(group: G): Promise<SettingsGroups[G]> {

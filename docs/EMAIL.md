@@ -4,7 +4,7 @@ Two separate jobs share one address, `care@intimatebunnie.com`:
 
 | Direction    | What                                     | Who does it                             |
 | ------------ | ---------------------------------------- | --------------------------------------- |
-| **Outbound** | Transactional mail the store sends        | Resend HTTP API, from the Worker         |
+| **Outbound** | Transactional mail the store sends        | Resend HTTP API, from the app            |
 | **Inbound**  | Anything a customer sends or replies to  | Cloudflare Email Routing → `yowens@yoassoc.com` |
 | **Replies**  | Staff answering *as* `care@`              | Gmail "Send mail as", relaying via Resend SMTP |
 
@@ -41,7 +41,7 @@ that will see it.
 
 Delivery never throws. An order is already committed by the time its receipt is
 sent — a mail outage must not turn a paid order into an error page. Failures land
-in the Worker log (`wrangler tail`).
+in the function logs.
 
 Without `RESEND_API_KEY` nothing is sent and each would-be send is logged, so
 local development works with no provider account.
@@ -60,7 +60,7 @@ local development works with no provider account.
 3. Wait for **Verified**.
 4. Create an API key (**sending access only**) and set it in Vercel → Settings →
    Environment Variables (Production), alongside `EMAIL_FROM` and
-   `EMAIL_REPLY_TO`. Redeploy — the Worker reads them at runtime, but nothing is
+   `EMAIL_REPLY_TO`. Redeploy — they are read at runtime, but nothing is
    sent until the key exists in that environment.
 
 DMARC is already live in monitor mode (`p=none`, reporting to Cloudflare). Leave

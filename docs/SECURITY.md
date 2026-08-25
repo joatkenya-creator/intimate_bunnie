@@ -2,8 +2,8 @@
 
 ## Authentication
 
-Sessions and password hashing run on Web Crypto, which exists in both Node and
-workerd — no auth dependency, no Node-only shim in the Worker.
+Sessions and password hashing run on Web Crypto — no auth dependency to keep
+patched, and nothing to swap if the runtime changes again.
 
 - **Passwords**: PBKDF2-SHA256, 100,000 iterations, 16-byte random salt, stored
   as `pbkdf2$iterations$salt$hash`.
@@ -103,7 +103,7 @@ than unwrapped, and any `target="_blank"` gains `rel="noopener noreferrer"`.
 `tests/html.test.ts` covers each of those. Sanitising on write rather than on
 read means the stored value is the safe value.
 
-It is a regex pass, not a DOM parse — workerd has no `DOMParser` and a parser
+It is a regex pass, not a DOM parse — the server runtime has no `DOMParser` and a parser
 dependency is 40 kB. It fails closed. If the admin ever accepts HTML from
 someone who is not staff, replace it with a real parser.
 
@@ -116,8 +116,8 @@ preload. `poweredByHeader` is off.
 
 ## Secrets
 
-Nothing is hardcoded. `DATABASE_URL` and `AUTH_SECRET` are Wrangler secrets in
-production, and `.env` is gitignored. `lib/db.ts` and `lib/auth.ts` are
+Nothing is hardcoded. `DATABASE_URL` and `AUTH_SECRET` are Vercel environment
+variables in production, and `.env` is gitignored. `lib/db.ts` and `lib/auth.ts` are
 `server-only`, so importing either from a client component is a build error
 rather than a leak.
 
@@ -171,7 +171,7 @@ challenge needs a real browser session.
 Login is throttled per account because credential stuffing rotates addresses far
 more cheaply than it rotates targets.
 
-The window lives in isolate memory, so each Worker isolate counts separately and
+The window lives in instance memory, so each serverless instance counts separately and
 a burst spread across isolates gets a proportionally larger allowance. That is
 enough to stop a script hammering `/admin`; move the counter to a Durable Object
 or Upstash before relying on it for anything billable.
@@ -210,7 +210,7 @@ filters the whole log by actor and subject area.
   application, and none should when Klarna is added. Refunds recorded in the
   admin write a ledger row and a timeline event; they do not move money until a
   gateway is connected behind `PaymentProvider`.
-- **Rate-limit state is per isolate** — see above. A Cloudflare WAF rule on
+- **Rate-limit state is per instance** — see above. A firewall rule on
   `/account/login` and `/admin` is still the cheapest hard cover.
 - **No 2FA.** For a store with a handful of staff, the idle timeout plus login
   throttling plus failed-attempt logging is the proportionate set. TOTP belongs

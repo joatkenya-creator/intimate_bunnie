@@ -1,14 +1,13 @@
 import 'server-only'
 import { query } from '@/lib/sql'
 
-// Scheduled publishing without a scheduler. Two UPDATEs flip anything whose
-// publish time has passed; `/api/redirects` calls this on the once-a-minute poll
-// middleware already makes, so scheduling works on the free plan with no cron
-// binding. Point a Cloudflare cron trigger at /api/admin/cron when the piggyback
-// is not precise enough.
+// Scheduled publishing. Two UPDATEs flip anything whose publish time has passed.
+// `/api/redirects` calls this on the once-a-minute poll middleware already makes,
+// so scheduling keeps working between cron runs; the cron entry in vercel.json
+// calls /api/admin/cron for exact timing and the low-stock sweep.
 //
-// Plain SQL, not Prisma: this runs on a public request path, and the WASM engine
-// cannot be instantiated inside the free plan's CPU budget.
+// Plain SQL, not Prisma: this runs on a public request path, which is kept free
+// of the ORM — see lib/sql.ts.
 
 export type SweepResult = { products: number; content: number; lowStockAlerts: number }
 

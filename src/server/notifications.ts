@@ -4,8 +4,8 @@ import { newId } from '@/lib/ids'
 
 // Notification writes live here rather than in server/admin.ts because checkout
 // and returns raise them, and those run on customer requests. Importing the
-// admin query layer would drag Prisma onto the storefront, and the WASM engine
-// cannot be instantiated inside the free plan's CPU budget.
+// admin query layer would drag Prisma onto the storefront path, which is
+// deliberately kept free of it — see lib/sql.ts.
 
 type NotificationInput = {
   type: 'ORDER' | 'LOW_STOCK' | 'REFUND' | 'PAYMENT_FAILED' | 'CUSTOMER' | 'SYSTEM'

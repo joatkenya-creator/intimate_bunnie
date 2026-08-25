@@ -12,8 +12,8 @@ import {
   type SessionPayload,
 } from './session'
 
-// Sessions run entirely on Web Crypto — available in both Node and workerd, so
-// no auth dependency and no Node-only shim in the Worker. Password hashing
+// Sessions run entirely on Web Crypto, so there is no auth dependency to keep
+// patched and nothing to swap if the runtime changes again. Password hashing
 // lives in ./password because the seed script needs it too; token signing lives
 // in ./session because middleware needs it and cannot import a server-only file.
 
@@ -88,9 +88,8 @@ async function readSession(): Promise<SessionPayload | null> {
 export type CurrentUser = { id: string; email: string; name: string | null; role: string }
 
 /**
- * Runs on every request through the header, so it must not touch Prisma: the
- * WASM engine cannot be instantiated inside the free plan's CPU budget. Plain
- * SQL over Neon's HTTP endpoint — see lib/sql.ts.
+ * Runs on every request through the header, so it stays on the cheapest path
+ * available: one bound query over Neon's HTTP endpoint, no ORM — see lib/sql.ts.
  */
 export async function currentUser(): Promise<CurrentUser | null> {
   const session = await readSession()

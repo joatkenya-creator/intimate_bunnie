@@ -1,12 +1,7 @@
 # Intimate Bunnie
 
 A U.S. adult ecommerce storefront built on Next.js (App Router) and PostgreSQL,
-deployed to Cloudflare Workers through OpenNext.
-
-**Worker bundle: 2880 KiB gzip** against a 2.5 MiB target and a 3.0 MiB hard
-limit. 1460 KiB of that is the Prisma query compiler WASM, bundled twice — once
-per Turbopack module layer. Run `npm run cf:size` before adding anything
-server-side; see [PERFORMANCE.md](docs/PERFORMANCE.md) for the full breakdown.
+deployed on Vercel.
 
 ## Requirements
 
@@ -55,16 +50,12 @@ promotions, content, blog, SEO, reports, settings, and staff roles — see
 | `npm run db:seed` | Reset and seed the catalog (destructive) |
 | `npm run db:seed:admin` | Built-in roles + settings defaults. Safe against a real store. |
 | `npm run db:seed:demo` | The above **plus** fictional staff, customers, and orders. Development only. |
-| `npm run cf:build` | Build the Cloudflare Worker |
-| `npm run cf:size` | Build, then print the gzip Worker size |
-| `npm run cf:deploy` | Build and deploy to Cloudflare |
 
 ## Verification chain
 
 ```bash
 npm run lint && npm run typecheck && npm test && npm run build
 npx prisma validate
-npm run cf:size          # Total Upload / gzip must stay under 2.5 MiB
 ```
 
 ## Docs
