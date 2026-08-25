@@ -1,7 +1,8 @@
 import type { Metadata } from 'next'
-import { listProducts } from '@/server/catalog'
+import { searchProducts } from '@/server/search'
 import { CatalogView, parseFilters, type SearchParamsRecord } from '@/components/product/CatalogView'
 import { pageMetadata } from '@/lib/seo'
+import { SearchSuggest } from '@/components/product/SearchSuggest'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,7 +25,7 @@ export async function generateMetadata({
 export default async function SearchPage({ searchParams }: { searchParams: Promise<SearchParamsRecord> }) {
   const params = await searchParams
   const filters = parseFilters(params)
-  const { items, total, page, pageCount } = await listProducts(filters)
+  const { items, total, page, pageCount } = await searchProducts(filters)
 
   return (
     <>
@@ -40,15 +41,17 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
               'Search the shop'
             )}
           </h1>
-          <form action="/search" role="search" className="mt-5 flex max-w-lg gap-2">
-            <label htmlFor="q" className="sr-only">
-              Search products
-            </label>
-            <input id="q" name="q" type="search" defaultValue={filters.q ?? ''} placeholder="Try “rose vibrator”" className="field" />
-            <button type="submit" className="btn btn-primary">
-              Search
-            </button>
-          </form>
+          <SearchSuggest
+            defaultValue={filters.q ?? ''}
+            placeholder="Try “rose vibrator”"
+            className="mt-5 max-w-lg"
+          />
+
+          {filters.q && total === 0 && (
+            <p className="mt-4 max-w-lg text-sm text-plum-500">
+              Nothing matched that, even allowing for spelling. Try a shorter word — “rose”, “oil”, “lace”.
+            </p>
+          )}
         </div>
       </div>
 

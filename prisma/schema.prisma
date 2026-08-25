@@ -142,6 +142,14 @@ model Product {
   @@index([priceCents])
   @@index([status, updatedAt])
   @@index([inventory])
+
+  // Trigram indexes backing typo-tolerant search (server/search.ts). Declared
+  // here so `prisma db push` does not drop them — it removes any index it does
+  // not know about, and search would quietly fall back to a sequential scan.
+  // The pg_trgm extension itself is created by hand; Prisma leaves extensions
+  // alone unless `postgresqlExtensions` is enabled, which it is not.
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin)
+  @@index([summary(ops: raw("gin_trgm_ops"))], type: Gin)
 }
 
 enum ProductStatus {
