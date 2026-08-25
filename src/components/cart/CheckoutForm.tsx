@@ -6,14 +6,25 @@ import { useState, useTransition } from 'react'
 import { useCart } from './CartProvider'
 import { placeOrder } from '@/actions/checkout'
 import { formatUSD, quoteTotals } from '@/lib/money'
-
-const US_STATES = 'AL AK AZ AR CA CO CT DE FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY DC'.split(' ')
+import { US_STATES, stateForZip } from '@/lib/zip'
 
 export function CheckoutForm({ defaultEmail, defaultName }: { defaultEmail: string; defaultName: string }) {
   const { lines, subtotalCents, clear } = useCart()
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
   const router = useRouter()
+  // The ZIP decides the state, never the other way round: a state has thousands
+  // of ZIPs, so filling one from the other would invent an address.
+  const [state, setState] = useState('')
+  const [zipFilledState, setZipFilledState] = useState(false)
+
+  function onZipChange(value: string) {
+    const resolved = stateForZip(value)
+    if (resolved && US_STATES.includes(resolved as (typeof US_STATES)[number]) && resolved !== state) {
+      setState(resolved)
+      setZipFilledState(true)
+    }
+  }
 
   if (lines.length === 0) {
     return (
@@ -97,19 +108,47 @@ export function CheckoutForm({ defaultEmail, defaultName }: { defaultEmail: stri
                 <label htmlFor="state" className="mb-1.5 block text-sm">
                   State
                 </label>
-                <select id="state" name="state" required autoComplete="address-level1" className="field">
-                  {US_STATES.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
+                <select
+                  id="state"
+                  name="state"
+                  required
+                  autoComplete="address-level1"
+                  className="field"
+                  value={state}
+                  onChange={(event) => {
+                    setState(event.target.value)
+                    setZipFilledState(false)
+                  }}
+                  aria-describedby={zipFilledState ? 'state-hint' : undefined}
+                >
+                  <option value="" disabled>
+                    Choose…
+                  </option>
+                  {US_STATES.map((code) => (
+                    <option key={code} value={code}>
+                      {code}
                     </option>
                   ))}
                 </select>
+                {zipFilledState && (
+                  <p id="state-hint" role="status" className="mt-1.5 text-xs text-plum-500">
+                    Filled from your ZIP. Change it if that is wrong.
+                  </p>
+                )}
               </div>
               <div>
                 <label htmlFor="zip" className="mb-1.5 block text-sm">
                   ZIP
                 </label>
-                <input id="zip" name="zip" required inputMode="numeric" autoComplete="postal-code" className="field" />
+                <input
+                  id="zip"
+                  name="zip"
+                  required
+                  inputMode="numeric"
+                  autoComplete="postal-code"
+                  className="field"
+                  onChange={(event) => onZipChange(event.target.value)}
+                />
               </div>
             </div>
           </div>

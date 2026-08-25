@@ -12,6 +12,7 @@ import { getPaymentProvider } from '@/services/payment'
 import { sendOrderPlaced } from '@/services/email'
 import { absoluteUrl } from '@/config/site'
 import { reference, newId } from '@/lib/ids'
+import { ZIP_PATTERN, zipMatchesState } from '@/lib/zip'
 
 const lineSchema = z.object({
   productId: z.string().min(1),
@@ -26,9 +27,16 @@ const checkoutSchema = z.object({
   line2: z.string().max(120).optional().or(z.literal('')),
   city: z.string().min(2).max(80),
   state: z.string().length(2),
-  zip: z.string().regex(/^\d{5}(-\d{4})?$/, 'Enter a valid U.S. ZIP code'),
+  zip: z.string().regex(ZIP_PATTERN, 'Enter a valid U.S. ZIP code'),
   lines: z.array(lineSchema).min(1).max(50),
 })
+  // The browser fills the state from the ZIP, but a form post is not obliged to
+  // agree with it. Checking the pair here is what stops a mismatched address
+  // reaching a shipping label.
+  .refine((value) => zipMatchesState(value.zip, value.state), {
+    path: ['zip'],
+    message: 'That ZIP code is not in the state you selected. Check both.',
+  })
 
 export type CheckoutInput = z.input<typeof checkoutSchema>
 export type CheckoutResult = { ok: true; orderNumber: string } | { ok: false; error: string }

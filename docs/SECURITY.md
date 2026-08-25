@@ -75,16 +75,31 @@ Checkout ignores prices from the browser. It re-reads every product and variant
 from the database, recomputes the subtotal, shipping, and tax, and only then
 creates the order. Editing localStorage changes nothing.
 
-Order creation and stock decrements share one `$transaction`, so an oversell
-cannot slip between the stock check and the write.
+Order creation and stock decrements share one transaction, so an oversell cannot
+slip between the stock check and the write. It is a Neon HTTP transaction: every
+statement is sent as one batch, which suits checkout because the pricing read
+already happened and the writes are fully determined by it.
 
 ## SQL injection
 
-All access goes through Prisma. The handful of `$queryRaw` calls in
-`src/server/admin.ts`, `reports.ts`, and `scheduler.ts` use tagged templates, so
-every interpolation is a bound parameter — never string concatenation. They exist
-because Postgres can compare two columns and truncate dates and Prisma's `where`
-cannot.
+Two access paths, both parameterised.
+
+The admin uses Prisma. Its handful of `$queryRaw` calls in `src/server/admin.ts`
+and `reports.ts` use tagged templates, so every interpolation is a bound
+parameter — they exist because Postgres can compare two columns and truncate
+dates where Prisma's `where` cannot.
+
+Everything a customer touches is hand-written SQL over `src/lib/sql.ts`. Values
+are **never** interpolated: `query(text, values)` binds them, and the `binder()`
+helper hands back `$n` placeholders so a conditional filter still cannot
+concatenate a value into the statement. The only strings ever interpolated into
+SQL there are column and sort fragments chosen from fixed maps in the module —
+`ORDER_BY` in `server/catalog.ts` is the example, and an unrecognised sort key
+falls back to a known one rather than reaching the query.
+
+Identifiers that collide with reserved words are quoted (`AS "order"`), and
+`limitOffset()` coerces its arguments with `Math.trunc` rather than binding them,
+because `LIMIT`/`OFFSET` are structural.
 
 ## XSS
 
