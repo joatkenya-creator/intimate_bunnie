@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { categoryBySlug, listProducts } from '@/server/catalog'
-import { CatalogView, parseFilters, type SearchParamsRecord } from '@/components/product/CatalogView'
+import { CatalogView, canonicalPath, parseFilters, type SearchParamsRecord } from '@/components/product/CatalogView'
 import { pageMetadata, jsonLd, breadcrumbSchema } from '@/lib/seo'
 
 type Params = { category: string }
@@ -11,15 +11,36 @@ type Params = { category: string }
 // Worker has no KV binding to back ISR. Add `revalidate` once a cache is wired.
 export const dynamic = 'force-dynamic'
 
-export async function generateMetadata({ params }: { params: Promise<Params> }): Promise<Metadata> {
-  const category = await categoryBySlug((await params).category)
-  if (!category) return pageMetadata({ title: 'Not found', description: '', path: '/shop', noindex: true })
+export async function generateMetadata({
+  params,
+  searchParams,
+}: {
+  params: Promise<Params>
+  searchParams: Promise<SearchParamsRecord>
+}): Promise<Metadata> {
+  const [{ category: slug }, sp] = await Promise.all([params, searchParams])
+  const category = await categoryBySlug(slug)
+  if (!category) {
+    return pageMetadata({
+      title: 'Category not found',
+      description: 'This category is no longer available.',
+      path: `/shop/${slug}`,
+      canonical: false,
+      noindex: true,
+    })
+  }
+
+  const page = parseFilters(sp).page ?? 1
+  // The brand is appended by the layout's title template, and repeating the
+  // category name twice in one title is the template metadata this is meant to
+  // avoid — not a phrase anyone searches for.
+  const title = category.seoTitle ?? `Shop ${category.name}`
 
   return pageMetadata({
-    title: category.seoTitle ?? `${category.name} — Shop ${category.name} Online`,
+    title: page > 1 ? `${title} — Page ${page}` : title,
     description:
       category.seoDesc ?? category.description ?? `Shop ${category.name} at Intimate Bunnie. Discreet U.S. shipping.`,
-    path: `/shop/${category.slug}`,
+    path: canonicalPath(`/shop/${category.slug}`, sp),
     image: category.heroImage,
   })
 }
@@ -37,6 +58,8 @@ export default async function CategoryPage({
 
   const filters = parseFilters(sp)
   const { items, total, page, pageCount } = await listProducts({ ...filters, categorySlug: slug })
+  // Past the last page is a soft 404 and an unbounded crawl surface.
+  if (page > pageCount && page > 1) notFound()
 
   const trail = [
     { name: 'Home', path: '/' },

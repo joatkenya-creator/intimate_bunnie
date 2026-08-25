@@ -1,12 +1,32 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
 import { featuredProducts, newArrivals, topCategories } from '@/server/catalog'
 import { ProductGrid } from '@/components/product/ProductCard'
 import { Section, SectionHeading } from '@/components/ui/Section'
 import { RecentlyViewed } from '@/components/product/RecentlyViewed'
-import { imageUrl } from '@/services/media'
+import { imageUrl, imageSrcSet, PLACEHOLDER_IMAGE } from '@/services/media'
+import { site } from '@/config/site'
+import { pageMetadata } from '@/lib/seo'
 
-// Live inventory, and no KV binding on the free plan to back ISR.
+// The root layout carries the site title and description; what it cannot carry
+// is a canonical, because the layout does not know which URL it is rendering.
+// Without this, every `/?utm_source=…` and `/?fbclid=…` is a separate URL with
+// no canonical pointing home.
+export const metadata: Metadata = {
+  ...pageMetadata({ title: `${site.name} — ${site.tagline}`, description: site.description, path: '/' }),
+  // `absolute` opts out of the layout's `%s | Intimate Bunnie` template, which
+  // would otherwise print the brand name twice on the one page it owns.
+  title: { absolute: `${site.name} — ${site.tagline}` },
+}
+
+// Live inventory. ISR would not help here anyway: the header reads the session
+// cookie, which opts every storefront route into dynamic rendering.
 export const dynamic = 'force-dynamic'
+
+// Two tiles per row on phones, three from `lg`.
+const TILE_SIZES = '(min-width: 1024px) 33vw, 50vw'
+const TILE_WIDTHS = [384, 640, 750]
+const HERO_WIDTHS = [640, 828, 1080, 1920]
 
 const promises = [
   { title: 'Discreet by default', copy: 'Plain outer packaging. Neutral billing descriptor. No branding, ever.' },
@@ -25,7 +45,9 @@ export default async function HomePage() {
       <section className="relative border-b border-line bg-plum-900">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/hero.webp"
+          src={imageUrl('/hero.webp', { width: 1920 })}
+          srcSet={imageSrcSet('/hero.webp', HERO_WIDTHS)}
+          sizes="100vw"
           alt="Black silk robe and lace lingerie styled on a rose-lit bed"
           width={1672}
           height={941}
@@ -73,11 +95,14 @@ export default async function HomePage() {
               <div className="aspect-[3/2]">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={imageUrl(cat.heroImage ?? `https://picsum.photos/seed/${cat.slug}/800/540`, { width: 800 })}
+                  src={cat.heroImage ? imageUrl(cat.heroImage, { width: 828 }) : PLACEHOLDER_IMAGE}
+                  srcSet={cat.heroImage ? imageSrcSet(cat.heroImage, TILE_WIDTHS) : undefined}
+                  sizes={cat.heroImage ? TILE_SIZES : undefined}
                   alt=""
                   width={800}
                   height={540}
                   loading="lazy"
+                  decoding="async"
                   className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
                 />
               </div>

@@ -17,14 +17,27 @@ type Params = { slug: string }
 export const dynamic = 'force-dynamic'
 
 export async function generateMetadata({ params }: { params: Promise<Params> }): Promise<Metadata> {
-  const product = await productBySlug((await params).slug)
-  if (!product) return pageMetadata({ title: 'Product not found', description: '', path: '/shop', noindex: true })
+  const { slug } = await params
+  const product = await productBySlug(slug)
+  // A missing product returns 404. `canonical: null` keeps the response from
+  // pointing search engines at /shop, which is a different page entirely.
+  if (!product) {
+    return pageMetadata({
+      title: 'Product not found',
+      description: 'This product is no longer available.',
+      path: `/product/${slug}`,
+      canonical: false,
+      noindex: true,
+    })
+  }
 
   return pageMetadata({
     title: product.seoTitle ?? product.name,
     description: product.seoDesc ?? product.summary,
     path: `/product/${product.slug}`,
     image: product.media[0]?.url,
+    canonical: product.canonicalUrl,
+    robots: product.robots,
   })
 }
 

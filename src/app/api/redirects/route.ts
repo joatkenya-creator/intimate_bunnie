@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic'
 //
 // The scheduled-publish sweep rides along on the same poll. That gives
 // minute-accurate scheduling with no cron binding; /api/admin/cron exposes the
-// same sweep for a real Cloudflare trigger.
+// same sweep for the scheduled cron trigger in vercel.json.
 
 export async function GET() {
   try {

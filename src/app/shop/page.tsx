@@ -1,19 +1,31 @@
 import type { Metadata } from 'next'
 import { listProducts } from '@/server/catalog'
-import { CatalogView, parseFilters, type SearchParamsRecord } from '@/components/product/CatalogView'
+import { notFound } from 'next/navigation'
+import { CatalogView, canonicalPath, parseFilters, type SearchParamsRecord } from '@/components/product/CatalogView'
 import { pageMetadata, jsonLd, breadcrumbSchema } from '@/lib/seo'
 
-export const metadata: Metadata = pageMetadata({
-  title: 'Shop All — Lingerie, Toys, Oils & Body Jewelry',
-  description:
-    'Browse every Intimate Bunnie product: lace lingerie and thongs, rose vibrators, dildos, penis rings, lubricants, body oils, and body jewelry. Discreet U.S. shipping.',
-  path: '/shop',
-})
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<SearchParamsRecord>
+}): Promise<Metadata> {
+  const params = await searchParams
+  const page = parseFilters(params).page ?? 1
+  return pageMetadata({
+    title: page > 1 ? `Shop All — Page ${page}` : 'Shop All — Lingerie, Toys, Oils & Body Jewelry',
+    description:
+      'Browse every Intimate Bunnie product: lace lingerie and thongs, rose vibrators, dildos, penis rings, lubricants, body oils, and body jewelry. Discreet U.S. shipping.',
+    path: canonicalPath('/shop', params),
+  })
+}
 
 export default async function ShopPage({ searchParams }: { searchParams: Promise<SearchParamsRecord> }) {
   const params = await searchParams
   const filters = parseFilters(params)
   const { items, total, page, pageCount } = await listProducts(filters)
+  // A page number past the end is an empty 200 — a soft 404, and an unbounded
+  // crawl surface. Answer it as the 404 it is.
+  if (page > pageCount && page > 1) notFound()
   const crumbs = jsonLd(breadcrumbSchema([{ name: 'Home', path: '/' }, { name: 'Shop', path: '/shop' }]))
 
   return (

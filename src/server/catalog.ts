@@ -142,6 +142,10 @@ export type ProductDetail = ProductCardData & {
   tags: string[]
   seoTitle: string | null
   seoDesc: string | null
+  // Set from Admin → SEO. The page renders both; without them the editor writes
+  // to columns nothing reads.
+  canonicalUrl: string | null
+  robots: string | null
   brand: { name: string; slug: string } | null
   variants: { id: string; optionName: string; optionValue: string; priceDelta: number; inventory: number }[]
   reviews: { id: string; authorName: string; rating: number; title: string; body: string; createdAt: string }[]
@@ -157,6 +161,7 @@ export function productBySlug(slug: string) {
         FROM "ProductMedia" pm WHERE pm."productId" = p."id"
       ), '[]'::json) AS media,
       p."categoryId", p."description", p."sku", p."tags", p."seoTitle", p."seoDesc",
+      p."canonicalUrl", p."robots",
       CASE WHEN b."id" IS NULL THEN NULL
            ELSE json_build_object('name', b."name", 'slug', b."slug") END AS brand,
       COALESCE((

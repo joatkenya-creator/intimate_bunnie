@@ -142,12 +142,22 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
       description: entry.seoDesc ?? entry.excerpt ?? '',
       path: `/pages/${slug}`,
       image: entry.heroImage,
-      noindex: entry.robots?.includes('noindex'),
+      canonical: entry.canonicalUrl,
+      robots: entry.robots,
     })
   }
 
   const doc = DOCS[slug]
-  if (!doc) return pageMetadata({ title: 'Not found', description: '', path: '/', noindex: true })
+  // 404: no canonical rather than one pointing at the homepage.
+  if (!doc) {
+    return pageMetadata({
+      title: 'Not found',
+      description: 'This page is no longer available.',
+      path: `/pages/${slug}`,
+      canonical: false,
+      noindex: true,
+    })
+  }
   return pageMetadata({ title: doc.title, description: doc.description, path: `/pages/${slug}` })
 }
 

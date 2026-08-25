@@ -3,7 +3,7 @@
 import Link from 'next/link'
 
 // Customers see a message, never a stack trace. The digest is enough to find
-// the real error in Cloudflare logs.
+// the real error in the deployment's runtime logs.
 export default function Error({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   return (
     <div className="container-ib flex flex-col items-center py-28 text-center">

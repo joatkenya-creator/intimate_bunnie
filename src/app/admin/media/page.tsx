@@ -163,8 +163,8 @@ export default async function AdminMedia({ searchParams }: { searchParams: Promi
           <Panel title="Image cropping">
             <p className="text-sm text-[var(--admin-muted)]">
               Not built. Cropping belongs in the transform layer, not in stored bytes — the boundary is{' '}
-              <code className="text-xs">ImageStorageProvider</code> in <code className="text-xs">services/media.ts</code>, and a
-              Cloudinary or Cloudflare Images implementation adds crop parameters to the URL without any page changing.
+              <code className="text-xs">imageUrl()</code> in <code className="text-xs">services/media.ts</code>, which already
+              resizes and re-encodes through the platform optimiser. Crop parameters would be added there, without any page changing.
             </p>
           </Panel>
         </div>

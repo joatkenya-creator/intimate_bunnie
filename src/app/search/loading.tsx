@@ -1,3 +1,10 @@
+// The product-grid skeleton, scoped to /search rather than the app root.
+//
+// At the root it wrapped every route in a Suspense boundary, which meant the
+// HTML shell was flushed before the page had decided anything — and a response
+// whose body has started cannot change its status. Every notFound() therefore
+// answered 200 with 404 content, and every redirect() degraded to a one-second
+// <meta refresh>. /search is the one grid route that never does either.
 export default function Loading() {
   return (
     <div className="container-ib py-14">
