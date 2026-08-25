@@ -14,14 +14,21 @@ export function SearchSuggest({
   placeholder = 'Search lingerie, vibrators, oils…',
   autoFocus = false,
   className = '',
+  onNavigate,
 }: {
   defaultValue?: string
   placeholder?: string
   autoFocus?: boolean
   className?: string
+  /** Fired when the shopper leaves for a product or the results page — lets a
+      containing panel, like the mobile nav, close itself. */
+  onNavigate?: () => void
 }) {
   const router = useRouter()
+  // Ids are generated: the nav search and the one on /search can both be in the
+  // document at once, and two elements sharing an id breaks label association.
   const listId = useId()
+  const inputId = useId()
   const [term, setTerm] = useState(defaultValue)
   const [items, setItems] = useState<Suggestion[]>([])
   const [open, setOpen] = useState(false)
@@ -71,6 +78,7 @@ export function SearchSuggest({
 
   function go(to: string) {
     setOpen(false)
+    onNavigate?.()
     router.push(to)
   }
 
@@ -100,14 +108,17 @@ export function SearchSuggest({
       <form
         action="/search"
         role="search"
-        onSubmit={() => setOpen(false)}
+        onSubmit={() => {
+          setOpen(false)
+          onNavigate?.()
+        }}
         className="flex gap-2"
       >
-        <label htmlFor="q" className="sr-only">
+        <label htmlFor={inputId} className="sr-only">
           Search products
         </label>
         <input
-          id="q"
+          id={inputId}
           name="q"
           type="search"
           autoFocus={autoFocus}

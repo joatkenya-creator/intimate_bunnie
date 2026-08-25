@@ -1,9 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { useCart } from '@/components/cart/CartProvider'
+import { SearchSuggest } from '@/components/product/SearchSuggest'
 import { BagIcon, BunnieMark, CloseIcon, HeartIcon, MenuIcon, SearchIcon, UserIcon } from '@/components/ui/icons'
 
 export type NavCategory = { slug: string; name: string; children: { slug: string; name: string }[] }
@@ -12,16 +12,6 @@ export function NavBar({ categories, signedIn }: { categories: NavCategory[]; si
   const { count, setOpen } = useCart()
   const [menuOpen, setMenuOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
-  const router = useRouter()
-
-  function submitSearch(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    const q = new FormData(e.currentTarget).get('q')?.toString().trim()
-    if (!q) return
-    setSearchOpen(false)
-    setMenuOpen(false)
-    router.push(`/search?q=${encodeURIComponent(q)}`)
-  }
 
   return (
     <>
@@ -36,7 +26,7 @@ export function NavBar({ categories, signedIn }: { categories: NavCategory[]; si
         </button>
 
         <Link href="/" className="flex shrink-0 items-center gap-2 lg:min-w-56" aria-label="Intimate Bunnie home">
-          <BunnieMark className="h-11 w-11 lg:h-14 lg:w-14" />
+          <BunnieMark priority className="h-11 w-11 lg:h-14 lg:w-14" />
           <span className="font-display whitespace-nowrap text-2xl tracking-tight lg:text-3xl">
             Intimate <span className="text-rose-500">Bunnie</span>
           </span>
@@ -104,19 +94,14 @@ export function NavBar({ categories, signedIn }: { categories: NavCategory[]; si
 
       {searchOpen && (
         <div className="border-t border-line py-3">
-          <form onSubmit={submitSearch} role="search">
-            <label htmlFor="site-search" className="sr-only">
-              Search products
-            </label>
-            <input
-              id="site-search"
-              name="q"
-              type="search"
-              autoFocus
-              placeholder="Search lingerie, vibrators, oils…"
-              className="field"
-            />
-          </form>
+          <SearchSuggest
+            autoFocus
+            placeholder="Search lingerie, vibrators, oils…"
+            onNavigate={() => {
+              setSearchOpen(false)
+              setMenuOpen(false)
+            }}
+          />
         </div>
       )}
 
