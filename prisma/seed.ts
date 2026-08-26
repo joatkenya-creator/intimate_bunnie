@@ -12,7 +12,9 @@ const img = (seed: string, n = 1) => `https://picsum.photos/seed/${seed}-${n}/90
 
 // Real landscape category banners live in /public/heroes; the rest still get a
 // placeholder. Re-seeding must not throw the real art away.
-const HEROES: Record<string, string> = { lingerie: '/heroes/lingerie.webp' }
+const HEROES: Record<string, string> = Object.fromEntries(
+  ['lingerie', 'thongs', 'babydolls', 'bodysuits'].map((slug) => [slug, `/heroes/${slug}.webp`]),
+)
 const hero = (slug: string) => HEROES[slug] ?? img(slug)
 
 type CategorySeed = { slug: string; name: string; description: string; children?: CategorySeed[] }

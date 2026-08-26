@@ -8,6 +8,10 @@ import { pageMetadata, jsonLd, breadcrumbSchema } from '@/lib/seo'
 
 const HERO_WIDTHS = [640, 828, 1080, 1920]
 
+// Banners whose model stands on the left: the copy and the image swap sides so
+// the words land on the empty half instead of over her.
+const HERO_COPY_RIGHT = new Set(['thongs', 'bodysuits'])
+
 type Params = { category: string }
 
 // Rendered per request: inventory and pricing must be live, and the free-plan
@@ -72,6 +76,7 @@ export default async function CategoryPage({
   ]
   const crumbs = jsonLd(breadcrumbSchema(trail))
   const banner = category.heroImage?.startsWith('/') ? category.heroImage : null
+  const copyRight = HERO_COPY_RIGHT.has(category.slug)
 
   return (
     <>
@@ -81,7 +86,8 @@ export default async function CategoryPage({
           seeded remote placeholders are portrait, so those keep the plain
           header. The banner is never cropped: full width at its own aspect
           below lg, and from lg the height is capped with the image setting its
-          own width from that, flush right over a blurred copy of itself. */}
+          own width from that, flush to whichever side the copy does not use,
+          over a blurred copy of itself. */}
       {banner ? (
         <section className="relative overflow-hidden border-b border-line bg-plum-900">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -100,14 +106,18 @@ export default async function CategoryPage({
             width={1344}
             height={768}
             fetchPriority="high"
-            className="relative w-full lg:ml-auto lg:h-[480px] lg:w-auto xl:h-[540px]"
+            className={`relative w-full lg:h-[480px] lg:w-auto xl:h-[540px] ${
+              copyRight ? 'lg:mr-auto' : 'lg:ml-auto'
+            }`}
           />
           <div
             aria-hidden
-            className="hidden lg:absolute lg:inset-0 lg:block lg:bg-gradient-to-r lg:from-plum-900 lg:from-30% lg:to-transparent lg:to-65%"
+            className={`hidden lg:absolute lg:inset-0 lg:block lg:from-plum-900 lg:from-30% lg:to-transparent lg:to-65% ${
+              copyRight ? 'lg:bg-gradient-to-l' : 'lg:bg-gradient-to-r'
+            }`}
           />
           <div className="container-ib py-10 lg:absolute lg:inset-0 lg:pt-[70px]">
-            <div className="max-w-xl text-cream">
+            <div className={`max-w-xl text-cream ${copyRight ? 'lg:ml-auto' : ''}`}>
               <nav aria-label="Breadcrumb" className="mb-4 text-xs text-cream/75">
                 <ol className="flex flex-wrap items-center gap-1.5">
                   {trail.slice(0, -1).map((crumb) => (
