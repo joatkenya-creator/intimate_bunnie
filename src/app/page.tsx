@@ -26,7 +26,6 @@ export const dynamic = 'force-dynamic'
 // Two tiles per row on phones, three from `lg`.
 const TILE_SIZES = '(min-width: 1024px) 33vw, 50vw'
 const TILE_WIDTHS = [384, 640, 750]
-const HERO_WIDTHS = [640, 828, 1080, 1920]
 
 const promises = [
   { title: 'Discreet by default', copy: 'Plain outer packaging. Neutral billing descriptor. No branding, ever.' },
@@ -39,58 +38,45 @@ export default async function HomePage() {
 
   return (
     <>
-      {/* Hero — one full-width landscape banner, never cropped: the shot keeps
-          its own aspect at 100vw, and the copy is stacked over it in the same
-          grid cell. Where the copy is taller than the shot (narrow phones) the
-          cell grows and the blurred copy of the same file fills the rest, so
-          the banner is never letterboxed and no pixel of the original is cut. */}
-      <section className="relative isolate grid overflow-hidden border-b border-line bg-plum-900">
+      {/* Hero — the full landscape shot, uncropped, with the copy over its dark
+          left side. Below lg the copy drops under the image so nothing has to
+          shrink to stay readable. */}
+      <section className="relative border-b border-line bg-plum-900">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={imageUrl('/hero.webp', { width: 640 })}
-          alt=""
-          aria-hidden
-          className="absolute inset-0 h-full w-full scale-110 object-cover blur-2xl"
-        />
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={imageUrl('/hero.webp', { width: 1920 })}
-          srcSet={imageSrcSet('/hero.webp', HERO_WIDTHS)}
-          sizes="100vw"
+          src="/hero.webp"
           alt="Black silk robe and lace lingerie styled on a rose-lit bed"
           width={1672}
           height={941}
           fetchPriority="high"
-          className="col-start-1 row-start-1 w-full self-center"
+          className="w-full"
         />
-        {/* Scrim. Dark enough under the copy to hold contrast over the lit part
-            of the shot, and pointer-events-none so it never eats a CTA click. */}
         <div
           aria-hidden
-          className="pointer-events-none col-start-1 row-start-1 bg-gradient-to-t from-plum-900/95 via-plum-900/75 to-plum-900/25 sm:bg-gradient-to-r sm:from-plum-900/95 sm:from-10% sm:via-plum-900/70 sm:via-45% sm:to-plum-900/10"
+          className="hidden lg:absolute lg:inset-0 lg:block lg:bg-gradient-to-r lg:from-black/85 lg:via-black/60 lg:to-transparent"
         />
-        <div className="container-ib col-start-1 row-start-1 flex w-full items-center py-10 lg:py-16">
-          <div className="max-w-xl text-cream [text-shadow:0_1px_12px_rgb(43_26_34_/_0.55)]">
+        <div className="container-ib py-12 lg:absolute lg:inset-0 lg:flex lg:items-center lg:py-0">
+          <div className="max-w-xl text-cream">
             <p className="eyebrow text-rose-300">New season · Intimates</p>
-            <h1 className="mt-3 text-3xl leading-[1.1] text-cream sm:text-4xl lg:text-6xl">
+            <h1 className="mt-3 text-4xl leading-[1.1] text-cream lg:text-6xl">
               Pleasure, <em className="not-italic text-rose-300">beautifully</em> considered.
             </h1>
-            <p className="mt-4 text-sm leading-relaxed text-cream/90 sm:text-base lg:mt-5 lg:text-lg">
+            <p className="mt-5 text-base leading-relaxed text-cream/85 lg:text-lg">
               Sheer lace, rose-petal vibrators, warm body oils, and jewelry that catches the light. Chosen for women who
               know exactly what they like.
             </p>
-            <div className="mt-6 flex flex-wrap gap-3 lg:mt-8">
+            <div className="mt-8 flex flex-wrap gap-3">
               <Link href="/shop" className="btn btn-primary">
                 Shop the collection
               </Link>
               <Link
                 href="/shop/lingerie"
-                className="btn border-cream bg-plum-900/40 text-cream backdrop-blur-sm hover:bg-cream hover:text-plum-900"
+                className="btn border-cream text-cream hover:bg-cream hover:text-plum-900"
               >
                 Lingerie &amp; thongs
               </Link>
             </div>
-            <p className="mt-5 text-xs uppercase tracking-[0.12em] text-cream/75 lg:mt-6">
+            <p className="mt-6 text-xs uppercase tracking-[0.12em] text-cream/70">
               Free discreet U.S. shipping over $59
             </p>
           </div>
