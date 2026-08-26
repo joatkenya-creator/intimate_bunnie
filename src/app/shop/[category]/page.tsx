@@ -6,11 +6,19 @@ import { CatalogView, canonicalPath, parseFilters, type SearchParamsRecord } fro
 import { imageUrl, imageSrcSet } from '@/services/media'
 import { pageMetadata, jsonLd, breadcrumbSchema } from '@/lib/seo'
 
-const HERO_WIDTHS = [640, 828, 1080, 1920]
+// The banners top out at 1672px, so asking the optimiser for more would upscale
+// the source and ship a soft, heavier file for nothing.
+const HERO_WIDTHS = [640, 828, 1080, 1200]
 
-// Banners whose model stands on the left: the copy and the image swap sides so
-// the words land on the empty half instead of over her.
-const HERO_COPY_RIGHT = new Set(['thongs', 'bodysuits'])
+// Each banner's intrinsic size, and which side the copy takes — always the half
+// the model is not standing on, so the words never land over her.
+const BANNERS: Record<string, { width: number; height: number; copyRight: boolean }> = {
+  thongs: { width: 1672, height: 941, copyRight: true },
+  bodysuits: { width: 1344, height: 768, copyRight: true },
+  babydolls: { width: 1344, height: 768, copyRight: false },
+  lingerie: { width: 1344, height: 768, copyRight: false },
+}
+const BANNER_FALLBACK = { width: 1344, height: 768, copyRight: false }
 
 type Params = { category: string }
 
@@ -76,35 +84,44 @@ export default async function CategoryPage({
   ]
   const crumbs = jsonLd(breadcrumbSchema(trail))
   const banner = category.heroImage?.startsWith('/') ? category.heroImage : null
-  const copyRight = HERO_COPY_RIGHT.has(category.slug)
+  const { width, height, copyRight } = BANNERS[category.slug] ?? BANNER_FALLBACK
 
   return (
     <>
       <script type={crumbs.type} dangerouslySetInnerHTML={{ __html: crumbs.html }} />
 
-      {/* Hero. A local heroImage is one of our landscape category banners; the
-          seeded remote placeholders are portrait, so those keep the plain
-          header. The banner is never cropped: full width at its own aspect
-          below lg, and from lg the height is capped with the image setting its
-          the banner runs full width at its own 3.05:1 aspect, so nothing is
-          cropped and the height falls out of the width. The copy sits on the
-          empty half — right for the banners listed in HERO_COPY_RIGHT. */}
+      {/* Hero. A local heroImage is one of our 16:9 category banners; the seeded
+          remote placeholders are portrait, so those keep the plain header. The
+          banner is never cropped. Below lg it runs full width at its own aspect;
+          from lg the height is capped and the image takes its width from that,
+          sitting flush to the copy's side so the words land on its empty half.
+          A blurred, scaled copy of the same file fills the space the cap leaves,
+          so bounding the height costs no pixels and leaves no bare band. */}
       {banner ? (
-        <section className="relative border-b border-line bg-plum-900">
+        <section className="relative overflow-hidden border-b border-line bg-plum-900">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={imageUrl(banner, { width: 1920 })}
-            srcSet={imageSrcSet(banner, HERO_WIDTHS)}
-            sizes="100vw"
+            src={imageUrl(banner, { width: 640 })}
             alt=""
-            width={2342}
-            height={768}
+            aria-hidden
+            className="absolute inset-0 hidden h-full w-full scale-110 object-cover blur-2xl lg:block"
+          />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={imageUrl(banner, { width: 1200 })}
+            srcSet={imageSrcSet(banner, HERO_WIDTHS)}
+            sizes="(min-width: 1024px) 960px, 100vw"
+            alt=""
+            width={width}
+            height={height}
             fetchPriority="high"
-            className="w-full"
+            className={`relative w-full lg:h-[480px] lg:w-auto xl:h-[540px] ${
+              copyRight ? 'lg:ml-auto' : 'lg:mr-auto'
+            }`}
           />
           <div
             aria-hidden
-            className={`hidden lg:absolute lg:inset-0 lg:block lg:from-plum-900/80 lg:from-15% lg:to-transparent lg:to-55% ${
+            className={`hidden lg:absolute lg:inset-0 lg:block lg:from-black/85 lg:via-black/60 lg:to-transparent ${
               copyRight ? 'lg:bg-gradient-to-l' : 'lg:bg-gradient-to-r'
             }`}
           />
