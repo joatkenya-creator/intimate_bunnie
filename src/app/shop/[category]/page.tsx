@@ -86,8 +86,8 @@ export default async function CategoryPage({
           seeded remote placeholders are portrait, so those keep the plain
           header. The banner is never cropped: full width at its own aspect
           below lg, and from lg the height is capped with the image setting its
-          own width from that, flush to whichever side the copy does not use,
-          over a blurred copy of itself. */}
+          own width from that, over a blurred copy of itself — the home hero's
+          layout, mirrored for the banners listed in HERO_COPY_RIGHT. */}
       {banner ? (
         <section className="relative overflow-hidden border-b border-line bg-plum-900">
           {/* eslint-disable-next-line @next/next/no-img-element */}
