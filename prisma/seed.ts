@@ -10,6 +10,11 @@ const db = new PrismaClient({ adapter: new PrismaPg({ connectionString }) })
 
 const img = (seed: string, n = 1) => `https://picsum.photos/seed/${seed}-${n}/900/1125`
 
+// Real landscape category banners live in /public/heroes; the rest still get a
+// placeholder. Re-seeding must not throw the real art away.
+const HEROES: Record<string, string> = { lingerie: '/heroes/lingerie.webp' }
+const hero = (slug: string) => HEROES[slug] ?? img(slug)
+
 type CategorySeed = { slug: string; name: string; description: string; children?: CategorySeed[] }
 
 const CATEGORIES: CategorySeed[] = [
@@ -631,7 +636,7 @@ async function main() {
         slug: parent.slug,
         name: parent.name,
         description: parent.description,
-        heroImage: img(parent.slug),
+        heroImage: hero(parent.slug),
         position: index,
         seoTitle: `${parent.name} — Shop ${parent.name} Online`,
         seoDesc: parent.description,
@@ -646,7 +651,7 @@ async function main() {
           slug: child.slug,
           name: child.name,
           description: child.description,
-          heroImage: img(child.slug),
+          heroImage: hero(child.slug),
           position: childIndex,
           parentId: created.id,
           seoTitle: `${child.name}`,
