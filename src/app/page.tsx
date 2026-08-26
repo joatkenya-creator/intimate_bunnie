@@ -39,26 +39,35 @@ export default async function HomePage() {
 
   return (
     <>
-      {/* Hero — the full landscape shot, uncropped, with the copy over its dark
-          left side. Below lg the copy drops under the image so nothing has to
-          shrink to stay readable. */}
-      <section className="relative border-b border-line bg-plum-900">
+      {/* Hero — the shot is never cropped. Below lg it runs full width at its
+          own aspect; from lg the height is capped and the image sets its own
+          width from that, sitting flush right. A blurred, scaled copy of the
+          same file fills the space it leaves, so capping the height costs no
+          pixels of the original and no bare band beside it. */}
+      <section className="relative overflow-hidden border-b border-line bg-plum-900">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={imageUrl('/hero.webp', { width: 640 })}
+          alt=""
+          aria-hidden
+          className="absolute inset-0 hidden h-full w-full scale-110 object-cover blur-2xl lg:block"
+        />
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={imageUrl('/hero.webp', { width: 1920 })}
           srcSet={imageSrcSet('/hero.webp', HERO_WIDTHS)}
-          sizes="100vw"
+          sizes="(min-width: 1024px) 60vw, 100vw"
           alt="Black silk robe and lace lingerie styled on a rose-lit bed"
           width={1672}
           height={941}
           fetchPriority="high"
-          className="w-full"
+          className="relative w-full lg:ml-auto lg:h-[480px] lg:w-auto xl:h-[540px]"
         />
         <div
           aria-hidden
-          className="hidden lg:absolute lg:inset-0 lg:block lg:bg-gradient-to-r lg:from-black/85 lg:via-black/60 lg:to-transparent"
+          className="hidden lg:absolute lg:inset-0 lg:block lg:bg-gradient-to-r lg:from-plum-900 lg:from-30% lg:to-transparent lg:to-65%"
         />
-        <div className="container-ib py-12 lg:absolute lg:inset-0 lg:flex lg:items-center lg:py-0">
+        <div className="container-ib py-12 lg:absolute lg:inset-0 lg:pt-[70px]">
           <div className="max-w-xl text-cream">
             <p className="eyebrow text-rose-300">New season · Intimates</p>
             <h1 className="mt-3 text-4xl leading-[1.1] text-cream lg:text-6xl">
