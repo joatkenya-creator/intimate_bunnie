@@ -10,15 +10,15 @@ import { pageMetadata, jsonLd, breadcrumbSchema } from '@/lib/seo'
 // the source and ship a soft, heavier file for nothing.
 const HERO_WIDTHS = [640, 828, 1080, 1200]
 
-// Each banner's intrinsic size, and which side the copy takes — always the half
-// the model is not standing on, so the words never land over her.
-const BANNERS: Record<string, { width: number; height: number; copyRight: boolean }> = {
-  thongs: { width: 1672, height: 941, copyRight: true },
-  bodysuits: { width: 1344, height: 768, copyRight: true },
-  babydolls: { width: 1344, height: 768, copyRight: false },
-  lingerie: { width: 1344, height: 768, copyRight: false },
+// Each banner's intrinsic size, and which side the image sits on. The copy
+// takes the opposite side, so it lands on the blurred fill rather than on her.
+const BANNERS: Record<string, { width: number; height: number; imageRight: boolean }> = {
+  thongs: { width: 1672, height: 941, imageRight: true },
+  bodysuits: { width: 1344, height: 768, imageRight: true },
+  babydolls: { width: 1344, height: 768, imageRight: false },
+  lingerie: { width: 1344, height: 768, imageRight: false },
 }
-const BANNER_FALLBACK = { width: 1344, height: 768, copyRight: false }
+const BANNER_FALLBACK = { width: 1344, height: 768, imageRight: false }
 
 type Params = { category: string }
 
@@ -84,7 +84,7 @@ export default async function CategoryPage({
   ]
   const crumbs = jsonLd(breadcrumbSchema(trail))
   const banner = category.heroImage?.startsWith('/') ? category.heroImage : null
-  const { width, height, copyRight } = BANNERS[category.slug] ?? BANNER_FALLBACK
+  const { width, height, imageRight } = BANNERS[category.slug] ?? BANNER_FALLBACK
 
   return (
     <>
@@ -94,7 +94,7 @@ export default async function CategoryPage({
           remote placeholders are portrait, so those keep the plain header. The
           banner is never cropped. Below lg it runs full width at its own aspect;
           from lg the height is capped and the image takes its width from that,
-          sitting flush to the copy's side so the words land on its empty half.
+          sitting flush to one side so the copy has the other to itself.
           A blurred, scaled copy of the same file fills the space the cap leaves,
           so bounding the height costs no pixels and leaves no bare band. */}
       {banner ? (
@@ -116,17 +116,17 @@ export default async function CategoryPage({
             height={height}
             fetchPriority="high"
             className={`relative w-full lg:h-[480px] lg:w-auto xl:h-[540px] ${
-              copyRight ? 'lg:ml-auto' : 'lg:mr-auto'
+              imageRight ? 'lg:ml-auto' : 'lg:mr-auto'
             }`}
           />
           <div
             aria-hidden
             className={`hidden lg:absolute lg:inset-0 lg:block lg:from-black/85 lg:via-black/60 lg:to-transparent ${
-              copyRight ? 'lg:bg-gradient-to-l' : 'lg:bg-gradient-to-r'
+              imageRight ? 'lg:bg-gradient-to-r' : 'lg:bg-gradient-to-l'
             }`}
           />
           <div className="container-ib py-10 lg:absolute lg:inset-0 lg:pt-[70px]">
-            <div className={`max-w-xl text-cream ${copyRight ? 'lg:ml-auto' : ''}`}>
+            <div className={`max-w-xl text-cream ${imageRight ? '' : 'lg:ml-auto'}`}>
               <nav aria-label="Breadcrumb" className="mb-4 text-xs text-cream/75">
                 <ol className="flex flex-wrap items-center gap-1.5">
                   {trail.slice(0, -1).map((crumb) => (
