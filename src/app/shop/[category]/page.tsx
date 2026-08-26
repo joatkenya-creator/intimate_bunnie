@@ -86,33 +86,25 @@ export default async function CategoryPage({
           seeded remote placeholders are portrait, so those keep the plain
           header. The banner is never cropped: full width at its own aspect
           below lg, and from lg the height is capped with the image setting its
-          own width from that, over a blurred copy of itself — the home hero's
-          layout, mirrored for the banners listed in HERO_COPY_RIGHT. */}
+          the banner runs full width at its own 3.05:1 aspect, so nothing is
+          cropped and the height falls out of the width. The copy sits on the
+          empty half — right for the banners listed in HERO_COPY_RIGHT. */}
       {banner ? (
-        <section className="relative overflow-hidden border-b border-line bg-plum-900">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={imageUrl(banner, { width: 640 })}
-            alt=""
-            aria-hidden
-            className="absolute inset-0 hidden h-full w-full scale-110 object-cover blur-2xl lg:block"
-          />
+        <section className="relative border-b border-line bg-plum-900">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={imageUrl(banner, { width: 1920 })}
             srcSet={imageSrcSet(banner, HERO_WIDTHS)}
-            sizes="(min-width: 1024px) 60vw, 100vw"
+            sizes="100vw"
             alt=""
-            width={1344}
+            width={2342}
             height={768}
             fetchPriority="high"
-            className={`relative w-full lg:h-[480px] lg:w-auto xl:h-[540px] ${
-              copyRight ? 'lg:mr-auto' : 'lg:ml-auto'
-            }`}
+            className="w-full"
           />
           <div
             aria-hidden
-            className={`hidden lg:absolute lg:inset-0 lg:block lg:from-plum-900 lg:from-30% lg:to-transparent lg:to-65% ${
+            className={`hidden lg:absolute lg:inset-0 lg:block lg:from-plum-900/80 lg:from-15% lg:to-transparent lg:to-55% ${
               copyRight ? 'lg:bg-gradient-to-l' : 'lg:bg-gradient-to-r'
             }`}
           />
