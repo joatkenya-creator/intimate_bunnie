@@ -77,10 +77,11 @@ export default async function CategoryPage({
     <>
       <script type={crumbs.type} dangerouslySetInnerHTML={{ __html: crumbs.html }} />
 
-      {/* Hero. A local heroImage is one of our landscape category banners, shown
-          uncropped at its own aspect with the copy over its dark side; the
-          seeded remote placeholders are portrait, so those keep the plain
-          header. Below lg the copy drops under the image. */}
+      {/* Hero. A local heroImage is one of our landscape category banners,
+          capped to a banner height and anchored to the top so the crop takes
+          the foot of the frame, never a face; the seeded remote placeholders
+          are portrait, so those keep the plain header. Below lg the copy
+          drops under the image. */}
       {banner ? (
         <section className="relative border-b border-line bg-plum-900">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -92,7 +93,7 @@ export default async function CategoryPage({
             width={1344}
             height={768}
             fetchPriority="high"
-            className="w-full"
+            className="h-[300px] w-full object-cover object-[65%_top] sm:h-[360px] lg:h-[460px] xl:h-[520px]"
           />
           <div
             aria-hidden
