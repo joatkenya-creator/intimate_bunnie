@@ -77,29 +77,36 @@ export default async function CategoryPage({
     <>
       <script type={crumbs.type} dangerouslySetInnerHTML={{ __html: crumbs.html }} />
 
-      {/* Hero. A local heroImage is one of our landscape category banners,
-          capped to a banner height and anchored to the top so the crop takes
-          the foot of the frame, never a face; the seeded remote placeholders
-          are portrait, so those keep the plain header. Below lg the copy
-          drops under the image. */}
+      {/* Hero. A local heroImage is one of our landscape category banners; the
+          seeded remote placeholders are portrait, so those keep the plain
+          header. The banner is never cropped: full width at its own aspect
+          below lg, and from lg the height is capped with the image setting its
+          own width from that, flush right over a blurred copy of itself. */}
       {banner ? (
-        <section className="relative border-b border-line bg-plum-900">
+        <section className="relative overflow-hidden border-b border-line bg-plum-900">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={imageUrl(banner, { width: 640 })}
+            alt=""
+            aria-hidden
+            className="absolute inset-0 hidden h-full w-full scale-110 object-cover blur-2xl lg:block"
+          />
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={imageUrl(banner, { width: 1920 })}
             srcSet={imageSrcSet(banner, HERO_WIDTHS)}
-            sizes="100vw"
+            sizes="(min-width: 1024px) 60vw, 100vw"
             alt=""
             width={1344}
             height={768}
             fetchPriority="high"
-            className="h-[300px] w-full object-cover object-[65%_top] sm:h-[360px] lg:h-[460px] xl:h-[520px]"
+            className="relative w-full lg:ml-auto lg:h-[480px] lg:w-auto xl:h-[540px]"
           />
           <div
             aria-hidden
-            className="hidden lg:absolute lg:inset-0 lg:block lg:bg-gradient-to-r lg:from-black/85 lg:via-black/55 lg:to-transparent"
+            className="hidden lg:absolute lg:inset-0 lg:block lg:bg-gradient-to-r lg:from-plum-900 lg:from-30% lg:to-transparent lg:to-65%"
           />
-          <div className="container-ib py-10 lg:absolute lg:inset-0 lg:flex lg:items-center lg:py-0">
+          <div className="container-ib py-10 lg:absolute lg:inset-0 lg:pt-[70px]">
             <div className="max-w-xl text-cream">
               <nav aria-label="Breadcrumb" className="mb-4 text-xs text-cream/75">
                 <ol className="flex flex-wrap items-center gap-1.5">
