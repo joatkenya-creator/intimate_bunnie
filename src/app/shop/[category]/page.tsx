@@ -20,9 +20,9 @@ const BANNERS: Record<string, { width: number; height: number; imageRight: boole
   bodysuits: { width: 1344, height: 768, imageRight: true },
   babydolls: { width: 1344, height: 768, imageRight: false },
   lingerie: { width: 1344, height: 768, imageRight: false },
-  vibrators: { width: 1672, height: 941, imageRight: true, baked: true },
-  'rose-vibrators': { width: 1672, height: 941, imageRight: true, baked: true },
-  'bullet-wand': { width: 1672, height: 941, imageRight: true, baked: true },
+  vibrators: { width: 1672, height: 669, imageRight: true, baked: true },
+  'rose-vibrators': { width: 1672, height: 669, imageRight: true, baked: true },
+  'bullet-wand': { width: 1672, height: 669, imageRight: true, baked: true },
 }
 const BANNER_FALLBACK = { width: 1344, height: 768, imageRight: false }
 
