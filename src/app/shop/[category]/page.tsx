@@ -6,9 +6,15 @@ import { CatalogView, canonicalPath, parseFilters, type SearchParamsRecord } fro
 import { imageUrl, imageSrcSet } from '@/services/media'
 import { pageMetadata, jsonLd, breadcrumbSchema } from '@/lib/seo'
 
-// The banners top out at 1672px, so asking the optimiser for more would upscale
-// the source and ship a soft, heavier file for nothing.
+// The side-flush banners top out at 1672px and never render wider than half the
+// viewport, so asking the optimiser for more would ship a heavier file for
+// nothing. A baked banner is different: it runs edge to edge, and the baked
+// headline is the first thing to go soft when the browser paints a 1080px
+// rendition across 1440 CSS pixels — so it gets renditions up to its own 2353.
 const HERO_WIDTHS = [640, 828, 1080, 1200]
+const BAKED_WIDTHS = [828, 1200, 1920, 2048]
+// Baked type is thin serif on a gradient; the 72 default re-encodes it into mush.
+const BAKED_QUALITY = 85
 
 // Each banner's intrinsic size, and which side the image sits on. The copy
 // takes the opposite side, so it lands on the blurred fill rather than on her.
@@ -20,9 +26,9 @@ const BANNERS: Record<string, { width: number; height: number; imageRight: boole
   bodysuits: { width: 1344, height: 768, imageRight: true },
   babydolls: { width: 1344, height: 768, imageRight: false },
   lingerie: { width: 1344, height: 768, imageRight: false },
-  vibrators: { width: 1672, height: 669, imageRight: true, baked: true },
-  'rose-vibrators': { width: 1672, height: 669, imageRight: true, baked: true },
-  'bullet-wand': { width: 1672, height: 669, imageRight: true, baked: true },
+  vibrators: { width: 2353, height: 941, imageRight: true, baked: true },
+  'rose-vibrators': { width: 2353, height: 941, imageRight: true, baked: true },
+  'bullet-wand': { width: 2353, height: 941, imageRight: true, baked: true },
 }
 const BANNER_FALLBACK = { width: 1344, height: 768, imageRight: false }
 
@@ -116,9 +122,9 @@ export default async function CategoryPage({
           )}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={imageUrl(banner, { width: 1200 })}
-            srcSet={imageSrcSet(banner, HERO_WIDTHS)}
-            sizes="(min-width: 1024px) 960px, 100vw"
+            src={imageUrl(banner, { width: baked ? 1920 : 1200, quality: baked ? BAKED_QUALITY : undefined })}
+            srcSet={imageSrcSet(banner, baked ? BAKED_WIDTHS : HERO_WIDTHS, baked ? BAKED_QUALITY : undefined)}
+            sizes={baked ? '100vw' : '(min-width: 1024px) 960px, 100vw'}
             alt=""
             width={width}
             height={height}
