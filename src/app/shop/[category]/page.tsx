@@ -21,7 +21,13 @@ const BAKED_QUALITY = 85
 // `baked` marks the banners that carry their own headline (see
 // scripts/bake-hero-copy.mjs): those run full width so the words sit where the
 // art put them, and the overlay drops to a bar underneath.
-const BANNERS: Record<string, { width: number; height: number; imageRight: boolean; baked?: boolean }> = {
+// `inset` is art shot with its own negative space on the right: it also runs
+// full width and uncropped, but the HTML copy sits inside that space instead
+// of beside the image, so the CTA stays a real link.
+const BANNERS: Record<
+  string,
+  { width: number; height: number; imageRight: boolean; baked?: boolean; inset?: boolean }
+> = {
   thongs: { width: 1672, height: 941, imageRight: true },
   bodysuits: { width: 1344, height: 768, imageRight: true },
   babydolls: { width: 1344, height: 768, imageRight: false },
@@ -29,6 +35,7 @@ const BANNERS: Record<string, { width: number; height: number; imageRight: boole
   vibrators: { width: 2353, height: 941, imageRight: true, baked: true },
   'rose-vibrators': { width: 2353, height: 941, imageRight: true, baked: true },
   'bullet-wand': { width: 2353, height: 941, imageRight: true, baked: true },
+  dildos: { width: 2560, height: 1440, imageRight: false, inset: true },
 }
 const BANNER_FALLBACK = { width: 1344, height: 768, imageRight: false }
 
@@ -96,7 +103,10 @@ export default async function CategoryPage({
   ]
   const crumbs = jsonLd(breadcrumbSchema(trail))
   const banner = category.heroImage?.startsWith('/') ? category.heroImage : null
-  const { width, height, imageRight, baked } = BANNERS[category.slug] ?? BANNER_FALLBACK
+  const { width, height, imageRight, baked, inset } = BANNERS[category.slug] ?? BANNER_FALLBACK
+  // Full-width banners bring their own room for the copy; the side-flush ones
+  // borrow it from a blurred fill.
+  const fullWidth = baked || inset
 
   return (
     <>
@@ -111,7 +121,7 @@ export default async function CategoryPage({
           so bounding the height costs no pixels and leaves no bare band. */}
       {banner ? (
         <section className="relative overflow-hidden border-b border-line bg-plum-900">
-          {!baked && (
+          {!fullWidth && (
             /* eslint-disable-next-line @next/next/no-img-element */
             <img
               src={imageUrl(banner, { width: 640 })}
@@ -122,20 +132,20 @@ export default async function CategoryPage({
           )}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={imageUrl(banner, { width: baked ? 1920 : 1200, quality: baked ? BAKED_QUALITY : undefined })}
-            srcSet={imageSrcSet(banner, baked ? BAKED_WIDTHS : HERO_WIDTHS, baked ? BAKED_QUALITY : undefined)}
-            sizes={baked ? '100vw' : '(min-width: 1024px) 960px, 100vw'}
+            src={imageUrl(banner, { width: fullWidth ? 1920 : 1200, quality: baked ? BAKED_QUALITY : undefined })}
+            srcSet={imageSrcSet(banner, fullWidth ? BAKED_WIDTHS : HERO_WIDTHS, baked ? BAKED_QUALITY : undefined)}
+            sizes={fullWidth ? '100vw' : '(min-width: 1024px) 960px, 100vw'}
             alt=""
             width={width}
             height={height}
             fetchPriority="high"
             className={
-              baked
+              fullWidth
                 ? 'relative w-full'
                 : `relative w-full lg:h-[480px] lg:w-auto xl:h-[540px] ${imageRight ? 'lg:ml-auto' : 'lg:mr-auto'}`
             }
           />
-          {!baked && (
+          {!fullWidth && (
             <div
               aria-hidden
               className={`hidden lg:absolute lg:inset-0 lg:block lg:from-black/85 lg:via-black/60 lg:to-transparent ${
@@ -143,8 +153,15 @@ export default async function CategoryPage({
               }`}
             />
           )}
-          <div className={`container-ib py-10 ${baked ? '' : 'lg:absolute lg:inset-0 lg:pt-[70px]'}`}>
-            <div className={`max-w-xl text-cream ${imageRight || baked ? '' : 'lg:ml-auto'}`}>
+          <div
+            className={`container-ib py-10 ${
+              baked ? '' : inset ? 'lg:absolute lg:inset-0 lg:flex lg:items-center' : 'lg:absolute lg:inset-0 lg:pt-[70px]'
+            }`}
+          >
+            {/* The inset art keeps its right 42% clear, so the copy is held to
+                that width rather than max-w-xl, which would reach the products
+                at lg. */}
+            <div className={`max-w-xl text-cream ${inset ? 'lg:ml-auto lg:w-[42%] lg:max-w-none' : imageRight || baked ? '' : 'lg:ml-auto'}`}>
               <nav aria-label="Breadcrumb" className="mb-4 text-xs text-cream/75">
                 <ol className="flex flex-wrap items-center gap-1.5">
                   {trail.slice(0, -1).map((crumb) => (
@@ -167,6 +184,13 @@ export default async function CategoryPage({
                 <p className={`mt-4 text-base leading-relaxed text-cream/85 ${baked ? 'lg:sr-only' : ''}`}>
                   {category.description}
                 </p>
+              )}
+              {category.children.length === 0 && inset && (
+                <div className="mt-7">
+                  <a href="#products" className="btn border-cream bg-cream text-plum-900 hover:bg-white">
+                    Shop {category.name}
+                  </a>
+                </div>
               )}
               {category.children.length > 0 && (
                 <div className="mt-7 flex flex-wrap gap-3">
@@ -214,7 +238,7 @@ export default async function CategoryPage({
         </div>
       )}
 
-      <div className="pt-10">
+      <div id="products" className="pt-10">
         <CatalogView
           basePath={`/shop/${category.slug}`}
           params={sp}
