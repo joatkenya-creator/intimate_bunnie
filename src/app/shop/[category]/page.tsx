@@ -21,12 +21,15 @@ const BAKED_QUALITY = 85
 // `baked` marks the banners that carry their own headline (see
 // scripts/bake-hero-copy.mjs): those run full width so the words sit where the
 // art put them, and the overlay drops to a bar underneath.
-// `inset` is art shot with its own negative space on the right: it also runs
-// full width and uncropped, but the HTML copy sits inside that space instead
-// of beside the image, so the CTA stays a real link.
+// `inset` is art shot with its own negative space: it also runs full width and
+// uncropped, but the HTML copy sits inside that space instead of beside the
+// image, so the CTA stays a real link. `imageRight` says which side the space
+// is on, same as the side-flush banners, and `copy` sizes the column to that
+// space (default `lg:w-[42%]`; `lg:self-start` pins it to the top for art whose
+// subject climbs into the lower half).
 const BANNERS: Record<
   string,
-  { width: number; height: number; imageRight: boolean; baked?: boolean; inset?: boolean }
+  { width: number; height: number; imageRight: boolean; baked?: boolean; inset?: boolean; copy?: string }
 > = {
   thongs: { width: 1672, height: 941, imageRight: true },
   bodysuits: { width: 1344, height: 768, imageRight: true },
@@ -36,6 +39,10 @@ const BANNERS: Record<
   'rose-vibrators': { width: 2353, height: 941, imageRight: true, baked: true },
   'bullet-wand': { width: 2353, height: 941, imageRight: true, baked: true },
   dildos: { width: 2560, height: 1440, imageRight: false, inset: true },
+  'for-him': { width: 2560, height: 1440, imageRight: true, inset: true },
+  'penis-rings': { width: 2560, height: 1440, imageRight: true, inset: true, copy: 'lg:w-[42%] lg:self-start' },
+  strokers: { width: 2560, height: 1440, imageRight: false, inset: true, copy: 'lg:w-[36%]' },
+  enhancement: { width: 2560, height: 1440, imageRight: true, inset: true, copy: 'lg:w-[36%]' },
 }
 const BANNER_FALLBACK = { width: 1344, height: 768, imageRight: false }
 
@@ -103,7 +110,7 @@ export default async function CategoryPage({
   ]
   const crumbs = jsonLd(breadcrumbSchema(trail))
   const banner = category.heroImage?.startsWith('/') ? category.heroImage : null
-  const { width, height, imageRight, baked, inset } = BANNERS[category.slug] ?? BANNER_FALLBACK
+  const { width, height, imageRight, baked, inset, copy } = BANNERS[category.slug] ?? BANNER_FALLBACK
   // Full-width banners bring their own room for the copy; the side-flush ones
   // borrow it from a blurred fill.
   const fullWidth = baked || inset
@@ -158,10 +165,14 @@ export default async function CategoryPage({
               baked ? '' : inset ? 'lg:absolute lg:inset-0 lg:flex lg:items-center' : 'lg:absolute lg:inset-0 lg:pt-[70px]'
             }`}
           >
-            {/* The inset art keeps its right 42% clear, so the copy is held to
-                that width rather than max-w-xl, which would reach the products
-                at lg. */}
-            <div className={`max-w-xl text-cream ${inset ? 'lg:ml-auto lg:w-[42%] lg:max-w-none' : imageRight || baked ? '' : 'lg:ml-auto'}`}>
+            {/* The inset art keeps roughly 40% of its width clear, so the copy
+                is held to that rather than max-w-xl, which would reach the
+                products at lg. */}
+            <div
+              className={`max-w-xl text-cream ${inset ? `${copy ?? 'lg:w-[42%]'} lg:max-w-none` : ''} ${
+                imageRight || baked ? '' : 'lg:ml-auto'
+              }`}
+            >
               <nav aria-label="Breadcrumb" className="mb-4 text-xs text-cream/75">
                 <ol className="flex flex-wrap items-center gap-1.5">
                   {trail.slice(0, -1).map((crumb) => (
