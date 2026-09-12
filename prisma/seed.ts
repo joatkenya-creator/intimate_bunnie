@@ -15,7 +15,7 @@ const img = (seed: string, n = 1) => `https://picsum.photos/seed/${seed}-${n}/90
 const HEROES: Record<string, string> = Object.fromEntries(
   [
     'lingerie', 'thongs', 'babydolls', 'bodysuits', 'vibrators', 'rose-vibrators', 'bullet-wand', 'dildos',
-    'for-him', 'penis-rings', 'strokers', 'enhancement',
+    'for-him', 'penis-rings', 'strokers', 'enhancement', 'wellness', 'lubricants', 'body-oils', 'condoms',
   ].map((slug) => [slug, `/heroes/${slug}-wide.webp`]),
 )
 const hero = (slug: string) => HEROES[slug] ?? img(slug)

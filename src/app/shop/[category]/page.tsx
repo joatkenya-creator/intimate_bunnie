@@ -26,10 +26,20 @@ const BAKED_QUALITY = 85
 // image, so the CTA stays a real link. `imageRight` says which side the space
 // is on, same as the side-flush banners, and `copy` sizes the column to that
 // space (default `lg:w-[42%]`; `lg:self-start` pins it to the top for art whose
-// subject climbs into the lower half).
+// subject climbs into the lower half). `light` is inset art whose negative
+// space is pale — marble, plaster — so from lg the copy flips from cream to
+// plum; below lg it still sits under the image on the plum section.
 const BANNERS: Record<
   string,
-  { width: number; height: number; imageRight: boolean; baked?: boolean; inset?: boolean; copy?: string }
+  {
+    width: number
+    height: number
+    imageRight: boolean
+    baked?: boolean
+    inset?: boolean
+    copy?: string
+    light?: boolean
+  }
 > = {
   thongs: { width: 1672, height: 941, imageRight: true },
   bodysuits: { width: 1344, height: 768, imageRight: true },
@@ -43,6 +53,10 @@ const BANNERS: Record<
   'penis-rings': { width: 2560, height: 1440, imageRight: true, inset: true, copy: 'lg:w-[42%] lg:self-start' },
   strokers: { width: 2560, height: 1440, imageRight: false, inset: true, copy: 'lg:w-[36%]' },
   enhancement: { width: 2560, height: 1440, imageRight: true, inset: true, copy: 'lg:w-[36%]' },
+  wellness: { width: 2560, height: 1440, imageRight: true, inset: true, light: true, copy: 'lg:w-[36%] lg:self-start' },
+  lubricants: { width: 2560, height: 1440, imageRight: false, inset: true, light: true },
+  'body-oils': { width: 2560, height: 1440, imageRight: true, inset: true, light: true, copy: 'lg:w-[42%] lg:self-start' },
+  condoms: { width: 2560, height: 1440, imageRight: false, inset: true, light: true, copy: 'lg:w-[42%] lg:self-start' },
 }
 const BANNER_FALLBACK = { width: 1344, height: 768, imageRight: false }
 
@@ -110,10 +124,22 @@ export default async function CategoryPage({
   ]
   const crumbs = jsonLd(breadcrumbSchema(trail))
   const banner = category.heroImage?.startsWith('/') ? category.heroImage : null
-  const { width, height, imageRight, baked, inset, copy } = BANNERS[category.slug] ?? BANNER_FALLBACK
+  const { width, height, imageRight, baked, inset, copy, light } = BANNERS[category.slug] ?? BANNER_FALLBACK
   // Full-width banners bring their own room for the copy; the side-flush ones
   // borrow it from a blurred fill.
   const fullWidth = baked || inset
+  // Plum on pale art from lg up; the rose primary stays off it so no blush
+  // lands on the marble.
+  const ink = light
+    ? {
+        nav: 'lg:text-plum-500 lg:[&_a:hover]:text-rose-600',
+        current: 'lg:text-plum-900',
+        h1: 'lg:text-plum-900',
+        p: 'lg:text-plum-700',
+        solid: 'lg:border-plum-900 lg:bg-plum-900 lg:text-cream lg:hover:bg-plum-700',
+        ghost: 'lg:border-plum-900 lg:text-plum-900 lg:hover:bg-plum-900 lg:hover:text-cream',
+      }
+    : { nav: '', current: '', h1: '', p: '', solid: '', ghost: '' }
 
   return (
     <>
@@ -173,7 +199,7 @@ export default async function CategoryPage({
                 imageRight || baked ? '' : 'lg:ml-auto'
               }`}
             >
-              <nav aria-label="Breadcrumb" className="mb-4 text-xs text-cream/75">
+              <nav aria-label="Breadcrumb" className={`mb-4 text-xs text-cream/75 ${ink.nav}`}>
                 <ol className="flex flex-wrap items-center gap-1.5">
                   {trail.slice(0, -1).map((crumb) => (
                     <li key={crumb.path} className="flex items-center gap-1.5">
@@ -183,22 +209,22 @@ export default async function CategoryPage({
                       <span aria-hidden>/</span>
                     </li>
                   ))}
-                  <li aria-current="page" className="text-cream">
+                  <li aria-current="page" className={`text-cream ${ink.current}`}>
                     {category.name}
                   </li>
                 </ol>
               </nav>
-              <h1 className={`text-4xl leading-[1.1] text-cream lg:text-5xl ${baked ? 'lg:sr-only' : ''}`}>
+              <h1 className={`text-4xl leading-[1.1] text-cream lg:text-5xl ${ink.h1} ${baked ? 'lg:sr-only' : ''}`}>
                 {category.name}
               </h1>
               {category.description && (
-                <p className={`mt-4 text-base leading-relaxed text-cream/85 ${baked ? 'lg:sr-only' : ''}`}>
+                <p className={`mt-4 text-base leading-relaxed text-cream/85 ${ink.p} ${baked ? 'lg:sr-only' : ''}`}>
                   {category.description}
                 </p>
               )}
               {category.children.length === 0 && inset && (
                 <div className="mt-7">
-                  <a href="#products" className="btn border-cream bg-cream text-plum-900 hover:bg-white">
+                  <a href="#products" className={`btn border-cream bg-cream text-plum-900 hover:bg-white ${ink.solid}`}>
                     Shop {category.name}
                   </a>
                 </div>
@@ -211,8 +237,8 @@ export default async function CategoryPage({
                       href={`/shop/${sub.slug}`}
                       className={
                         i === 0
-                          ? 'btn btn-primary'
-                          : 'btn border-cream text-cream hover:bg-cream hover:text-plum-900'
+                          ? `btn btn-primary ${ink.solid}`
+                          : `btn border-cream text-cream hover:bg-cream hover:text-plum-900 ${ink.ghost}`
                       }
                     >
                       {sub.name}
