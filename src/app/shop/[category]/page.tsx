@@ -59,11 +59,10 @@ const BANNERS: Record<
   condoms: { width: 2560, height: 1440, imageRight: false, inset: true, light: true, copy: 'lg:w-[42%] lg:self-start' },
   'body-jewelry': { width: 2560, height: 1440, imageRight: true, inset: true, copy: 'lg:w-[28%]' },
   'nose-jewelry': { width: 2560, height: 1440, imageRight: true, inset: true, copy: 'lg:w-[40%]' },
-  // Shot edge to edge with no clear space, so these fall back to side-flush:
-  // the whole frame still shows, the copy just sits on the blurred fill.
-  'belly-rings': { width: 2560, height: 1440, imageRight: true },
-  'tongue-bars': { width: 2560, height: 1440, imageRight: true },
-  'nipple-jewelry': { width: 2560, height: 1440, imageRight: true },
+  // The open space on these is the top-left corner only, so the copy pins there.
+  'belly-rings': { width: 2560, height: 1440, imageRight: true, inset: true, copy: 'lg:w-[26%] lg:self-start' },
+  'tongue-bars': { width: 2560, height: 1440, imageRight: true, inset: true, copy: 'lg:w-[30%] lg:self-start' },
+  'nipple-jewelry': { width: 2560, height: 1440, imageRight: true, inset: true, copy: 'lg:w-[28%] lg:self-start' },
 }
 const BANNER_FALLBACK = { width: 1344, height: 768, imageRight: false }
 
