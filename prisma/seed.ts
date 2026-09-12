@@ -16,6 +16,7 @@ const HEROES: Record<string, string> = Object.fromEntries(
   [
     'lingerie', 'thongs', 'babydolls', 'bodysuits', 'vibrators', 'rose-vibrators', 'bullet-wand', 'dildos',
     'for-him', 'penis-rings', 'strokers', 'enhancement', 'wellness', 'lubricants', 'body-oils', 'condoms',
+    'body-jewelry', 'belly-rings', 'nose-jewelry', 'tongue-bars', 'nipple-jewelry',
   ].map((slug) => [slug, `/heroes/${slug}-wide.webp`]),
 )
 const hero = (slug: string) => HEROES[slug] ?? img(slug)
