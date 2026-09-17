@@ -4,9 +4,9 @@ import { absoluteUrl } from '@/config/site'
 
 export const dynamic = 'force-dynamic'
 
-// The seven documents that exist as code in app/pages/[slug], whether or not a
+// The eight documents that exist as code in app/pages/[slug], whether or not a
 // CMS entry has been written for them.
-const STATIC_SLUGS = ['about', 'shipping', 'returns', 'care', 'faq', 'privacy', 'terms']
+const STATIC_SLUGS = ['about', 'shipping', 'returns', 'care', 'faq', 'privacy', 'terms', 'contact']
 
 const isNoindex = (robots: string | null) => Boolean(robots?.toLowerCase().includes('noindex'))
 

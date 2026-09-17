@@ -1,8 +1,9 @@
 import { PrismaClient } from '../src/generated/prisma/client.ts'
 import { PrismaPg } from '@prisma/adapter-pg'
 
-// Catalog seed. Images are deterministic remote placeholders for development —
-// swap `img()` for real, licensed media before launch.
+// Catalog seed. Product images are the category-art crops in /public/products
+// (scripts/product-images-from-heroes.mjs); category banners fall back to a
+// remote placeholder.
 
 const connectionString = process.env.DATABASE_URL
 if (!connectionString) throw new Error('DATABASE_URL is not set')
@@ -696,16 +697,15 @@ async function main() {
         seoTitle: `${product.name}`,
         seoDesc: product.summary,
         media: {
-          create: [1, 2, 3].map((n) => ({
-            url: img(product.slug, n),
-            altText: `${product.name} — view ${n}`,
+          create: {
+            url: `/products/${product.slug}.webp`,
+            altText: product.name,
             width: 900,
             height: 1125,
-            mimeType: 'image/jpeg',
-            position: n - 1,
-            sourceType: 'placeholder',
-            licenseStatus: 'development-placeholder',
-          })),
+            mimeType: 'image/webp',
+            sourceType: 'category-art',
+            licenseStatus: 'store-owned',
+          },
         },
         variants: optionName
           ? {

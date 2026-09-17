@@ -1,8 +1,10 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { pageMetadata, jsonLd } from '@/lib/seo'
 import { site } from '@/config/site'
 import { queryOne } from '@/lib/sql'
+import { getSettings } from '@/server/settings'
 
 type Params = { slug: string }
 
@@ -22,22 +24,29 @@ const DOCS: Record<string, Doc> = {
     ],
   },
   shipping: {
-    title: 'Shipping & Discretion',
+    title: 'Shipping Policy',
     description:
       'Free U.S. shipping over $59, flat $5.99 otherwise. Every order ships in plain, unbranded packaging with a neutral billing descriptor.',
     body: [
-      'Orders placed before 2pm ET on a business day ship the same day. Standard delivery runs 3–5 business days within the contiguous United States.',
-      'Shipping is free on orders over $59. Below that, it is a flat $5.99. Alaska, Hawaii, and APO/FPO addresses may take longer.',
+      'We ship within the United States only, including Alaska, Hawaii, and APO/FPO addresses. We do not ship internationally.',
+      'Orders placed before 2pm ET on a business day are dispatched the same day; later orders leave the next business day. Standard delivery by USPS or UPS takes 3–5 business days within the contiguous United States. Alaska, Hawaii, and military addresses may take 7–10 business days.',
+      'Shipping is free on orders over $59. Below that, it is a flat $5.99. Expedited delivery (2–3 business days) is available at checkout for $14.99. Rates and thresholds are shown before you pay.',
+      'You will receive an email with a tracking number as soon as your order is dispatched. Orders can also be tracked from your account under Orders.',
       'Discretion is the default, not an upgrade. The outer box carries no branding, no product names, and no indication of the contents. The return address is a neutral business name, and your card statement shows the same.',
+      'If a parcel is returned to us as undeliverable, we will contact you to confirm the address and re-ship at no charge, or refund the order less the original shipping cost.',
     ],
   },
   returns: {
-    title: 'Returns',
-    description: 'Unopened items can be returned within 30 days. For health reasons, opened intimate products cannot.',
+    title: 'Returns & Refunds',
+    description: 'Unopened items can be returned within 30 days for a full refund. For health reasons, opened intimate products cannot.',
     body: [
-      'You have 30 days from delivery to return unopened, unused items in their original packaging for a full refund.',
+      'You have 30 days from delivery to return unopened, unused items in their original sealed packaging for a full refund of the item price.',
       'For health and hygiene reasons, we cannot accept returns on lingerie, toys, lubricants, oils, condoms, or body jewelry once the seal or packaging has been opened. This is standard across the industry and it is not negotiable.',
-      'If an item arrives damaged or defective, email us within 14 days and we will replace it or refund it, opened or not.',
+      'If an item arrives damaged, defective, or is not what you ordered, contact us within 14 days of delivery and we will replace it or refund it in full, opened or not, including any return postage.',
+      'To start a return, sign in to your account, open the order under Orders, and choose Request a return. We will email you a return authorisation and the address to send it to. Returns without an authorisation may be delayed.',
+      'Refunds are issued to the original payment method within 5–10 business days of the return arriving with us. Original shipping charges are refunded only when the return is due to our error. Return postage for change-of-mind returns is paid by the customer.',
+      'Orders can be cancelled for a full refund at any time before they are dispatched. Once an order has shipped, the return policy above applies.',
+      `Questions about a return go to ${site.email}.`,
     ],
   },
   care: {
@@ -79,22 +88,32 @@ const DOCS: Record<string, Doc> = {
   },
   privacy: {
     title: 'Privacy Policy',
-    description: 'What data Intimate Bunnie collects, why, and how long we keep it.',
+    description: 'What data Intimate Bunnie collects, why, who it is shared with, and how long we keep it.',
     body: [
-      'We collect the minimum needed to sell you something and deliver it: your email, shipping address, and order contents. We do not sell customer data, and we do not share your order contents with advertising networks.',
-      'Payment details are handled by our payment provider. Card numbers never touch our servers or our database.',
-      'We use privacy-respecting analytics to understand which pages work. You can block them with any standard content blocker without breaking the store.',
-      `Email ${site.email} to request a copy of your data or ask us to delete your account.`,
+      'What we collect. To sell you something and deliver it we collect your name, email address, shipping and billing address, phone number if you give one, and the contents of your orders. If you create an account we also store a hashed password and your order history.',
+      'Payments. Card payments are processed by our payment provider. Card numbers are entered directly with the provider and never touch our servers or our database. We receive only a confirmation of payment and the last four digits of the card for your receipt.',
+      'What we do not do. We do not sell customer data. We do not share your order contents with advertising networks. Your card statement and your parcel show a neutral business name, never a product name.',
+      'Who we share with. Your shipping details go to the carrier delivering your order (USPS or UPS). Your email and order details go to our transactional email service to send confirmations and tracking. Each of these processes data only on our instructions.',
+      'Cookies and analytics. We use a strictly necessary cookie to keep you signed in and to remember your cart, and a local setting to remember that you have confirmed your age. We use privacy-respecting analytics to understand which pages work; you can block them with any standard content blocker without breaking the store.',
+      'Retention. Order records are kept for seven years to meet tax and accounting obligations. Account data is kept until you delete your account, which you can do at any time from Account → Settings.',
+      `Your rights. Email ${site.email} to request a copy of your data, correct it, or ask us to delete your account. We respond within 30 days.`,
+      'Age. This site is for adults 18 and over. We do not knowingly collect data from anyone under 18; if you believe we have, contact us and we will delete it.',
     ],
   },
   terms: {
     title: 'Terms of Service',
     description: 'The terms that apply when you shop at Intimate Bunnie.',
     body: [
-      'By placing an order you confirm you are at least 18 years old and legally able to purchase adult products where you live.',
-      'Prices are in U.S. dollars and may change without notice. We reserve the right to cancel and refund any order, including for pricing errors or suspected fraud.',
-      'Product descriptions are written to be accurate about materials and dimensions. Nothing sold here is a medical device, and nothing on this site is medical advice.',
-      `Questions about these terms go to ${site.email}.`,
+      'Eligibility. By using this site or placing an order you confirm you are at least 18 years old and legally able to purchase adult products where you live. We may cancel any order where we cannot reasonably verify this.',
+      'Products. Everything sold here is a lawful consumer product sold at retail: intimate apparel, personal massagers and pleasure products, personal lubricants, condoms, body oils, and body jewelry. Product descriptions are written to be accurate about materials and dimensions. Nothing sold here is a medical device, and nothing on this site is medical advice.',
+      'Prices and payment. Prices are in U.S. dollars and exclude sales tax, which is calculated at checkout where applicable. Payment is taken in full at the time of order. We reserve the right to cancel and refund any order, including for pricing errors, stock errors, or suspected fraud.',
+      'Shipping, returns, and refunds. Delivery times, return eligibility, and refund timing are set out in our Shipping Policy and Returns & Refunds policy, which form part of these terms.',
+      'Billing descriptor. Charges appear on your card statement under a neutral business name. Please check your statement before disputing a charge you do not recognise; contact us first and we will resolve it faster than a chargeback will.',
+      'Accounts. You are responsible for keeping your password confidential and for activity under your account. Tell us promptly if you believe it has been used without your permission.',
+      'Intellectual property. The site, its copy, and its imagery belong to Intimate Bunnie and may not be reproduced without permission.',
+      'Liability. To the fullest extent permitted by law, our liability for any order is limited to the amount you paid for it. Nothing in these terms limits liability that cannot be limited by law.',
+      'Governing law. These terms are governed by the laws of the United States and of the state in which our registered business address, shown on our Contact page, is located.',
+      `Contact. Questions about these terms go to ${site.email}, or by post to the business address on our Contact page.`,
     ],
   },
 }
@@ -181,6 +200,8 @@ export default async function ContentPage({ params }: { params: Promise<Params> 
   const doc = DOCS[slug]
   if (!doc) notFound()
 
+  const legal = await getSettings('legal')
+
   const faqSchema =
     doc.faq &&
     jsonLd({
@@ -213,6 +234,15 @@ export default async function ContentPage({ params }: { params: Promise<Params> 
           ))}
         </dl>
       )}
+
+      <p className="mt-10 whitespace-pre-line border-t border-line pt-5 text-xs leading-relaxed text-plum-500">
+        {legal.businessName}
+        {legal.address ? `\n${legal.address}` : ''}
+        {'\n'}
+        <Link href="/pages/contact" className="link-underline">
+          Contact us
+        </Link>
+      </p>
     </div>
   )
 }

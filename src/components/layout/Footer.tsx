@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { BunnieMark } from '@/components/ui/icons'
 import { site } from '@/config/site'
+import { getSettings } from '@/server/settings'
 
 const columns = [
   {
@@ -21,6 +22,7 @@ const columns = [
       { href: '/pages/returns', label: 'Returns' },
       { href: '/pages/care', label: 'Body-Safe Materials' },
       { href: '/pages/faq', label: 'FAQ' },
+      { href: '/pages/contact', label: 'Contact Us' },
     ],
   },
   {
@@ -34,7 +36,8 @@ const columns = [
   },
 ]
 
-export function Footer() {
+export async function Footer() {
+  const legal = await getSettings('legal')
   return (
     <footer className="mt-24 border-t border-line bg-shell">
       <div className="container-ib grid gap-10 py-14 md:grid-cols-[1.4fr_repeat(3,1fr)]">
@@ -48,6 +51,11 @@ export function Footer() {
             <a href={`mailto:${site.email}`} className="link-underline">
               {site.email}
             </a>
+          </p>
+          <p className="mt-3 whitespace-pre-line text-xs leading-relaxed text-plum-500">
+            {legal.businessName}
+            {legal.address ? `
+${legal.address}` : ''}
           </p>
         </div>
 

@@ -157,10 +157,10 @@ export function CheckoutForm({ defaultEmail, defaultName }: { defaultEmail: stri
         <fieldset>
           <legend className="eyebrow mb-4">Payment</legend>
           <div className="border border-line bg-peach-50 p-5 text-sm text-plum-700">
-            <p className="font-medium">Test payment mode</p>
+            <p className="font-medium">Card payments are being enabled</p>
             <p className="mt-1.5 leading-relaxed text-plum-500">
-              No card is charged. Orders are recorded through the payment abstraction so a live provider can be
-              connected without changing this checkout.
+              Secure card checkout is coming shortly. Orders placed now are saved to your account and nothing is
+              charged; we will email you when payment is ready.
             </p>
           </div>
         </fieldset>
